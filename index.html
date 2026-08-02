@@ -988,8 +988,15 @@ function nextTurn() {
 }
 
 function advanceTurn() {
+  let safety = 0;
   do {
     gameState.currentPlayerIdx = (gameState.currentPlayerIdx + 1) % MAX_PLAYERS;
+    safety++;
+    if (safety > MAX_PLAYERS) {
+      // 所有玩家都死了，强制结束
+      gameState.gameOver = true;
+      return;
+    }
   } while (!gameState.players[gameState.currentPlayerIdx].alive);
 }
 
@@ -1791,11 +1798,13 @@ function showBubble(player, text) {
   bubble.textContent = text;
   document.body.appendChild(bubble);
 
-  // 定位：基于 seat 位置，但朝向中心，确保不超出屏幕
+  // 定位：基于头像位置，从头像中心向桌面中心方向偏移一小段距离
   requestAnimationFrame(() => {
-    const seatRect = seat.getBoundingClientRect();
-    const seatCx = seatRect.left + seatRect.width / 2;
-    const seatCy = seatRect.top + seatRect.height / 2;
+    const avatar = seat.querySelector('.avatar-box');
+    const refEl = avatar || seat; // 优先以头像为参考点
+    const refRect = refEl.getBoundingClientRect();
+    const refCx = refRect.left + refRect.width / 2;
+    const refCy = refRect.top + refRect.height / 2;
     const bw = 180; // max-width
     const bh = 40;  // approx height
 
@@ -1805,13 +1814,13 @@ function showBubble(player, text) {
     const scrCx = scrW / 2;
     const scrCy = scrH / 2;
 
-    // 气泡位置：靠近头像，从头像向屏幕中心方向偏移一小段距离
-    const dx = scrCx - seatCx;
-    const dy = scrCy - seatCy;
+    // 气泡位置：从头像中心向桌面中心方向偏移一段距离
+    const dx = scrCx - refCx;
+    const dy = scrCy - refCy;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    const offset = 55; // 距头像中心的偏移量
-    let tx = seatCx + (dx / dist) * offset;
-    let ty = seatCy + (dy / dist) * offset;
+    const offset = 60; // 距头像中心的偏移量
+    let tx = refCx + (dx / dist) * offset;
+    let ty = refCy + (dy / dist) * offset;
 
     // 边界限制
     tx = Math.max(bw / 2 + 10, Math.min(scrW - bw / 2 - 10, tx));

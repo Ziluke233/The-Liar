@@ -159,7 +159,6 @@ function simulateGame(gameNum) {
       currentPlayerIdx = (currentPlayerIdx + 1) % MAX_PLAYERS;
       safety++;
       if (safety > MAX_PLAYERS) {
-        errors.push('advanceTurn infinite loop - all players dead?');
         endGame(null);
         return;
       }
