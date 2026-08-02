@@ -210,7 +210,7 @@ body {
 
 /* 对话气泡 */
 .bubble {
-  position: absolute;
+  position: fixed;
   background: var(--bg-panel);
   border: 2px solid var(--accent-gold);
   border-radius: 12px;
@@ -221,21 +221,13 @@ body {
   text-align: center;
   z-index: 100;
   opacity: 0;
-  transform: translateY(8px);
-  transition: all 0.3s;
   pointer-events: none;
   box-shadow: 0 4px 12px rgba(0,0,0,0.6);
   line-height: 1.4;
+  transition: opacity 0.3s, transform 0.3s;
+  transform: translate(-50%, -50%) scale(0.8);
 }
-.bubble.show { opacity: 1; transform: translateY(0); }
-.seat[data-pos="top"] .bubble { bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(8px); }
-.seat[data-pos="top"] .bubble.show { transform: translateX(-50%) translateY(0); }
-.seat[data-pos="bottom"] .bubble { top: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(-8px); }
-.seat[data-pos="bottom"] .bubble.show { transform: translateX(-50%) translateY(0); }
-.seat[data-pos="left"] .bubble { right: calc(100% + 8px); top: 50%; transform: translateY(-50%) translateX(8px); }
-.seat[data-pos="left"] .bubble.show { transform: translateY(-50%) translateX(0); }
-.seat[data-pos="right"] .bubble { left: calc(100% + 8px); top: 50%; transform: translateY(-50%) translateX(-8px); }
-.seat[data-pos="right"] .bubble.show { transform: translateY(-50%) translateX(0); }
+.bubble.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
 /* ========== 中央区域 ========== */
 .center-area {
@@ -1154,9 +1146,11 @@ function aiChallengeDecision(challenger, targetPlayer, cards, isLying) {
     const dialogue = getDialogue(challenger, 'pass');
     showBubble(challenger, dialogue);
     addLog('💬 【' + challenger.name + '】"' + dialogue + '" (选择不质疑)', 'dia');
-    gameState.lastPlayerIdx = -1; // 重置质疑状态
+    gameState.lastPlayerIdx = -1; // 清除质疑状态
     gameState.awaitingChallenge = false;
-    advanceTurn();
+    // 不质疑 = 当前玩家继续出牌
+    renderSeats();
+    renderActions();
     setTimeout(() => {
       if (!gameState.gameOver) nextTurn();
     }, 400);
@@ -1220,7 +1214,11 @@ function performPenalty(player) {
     addLog('💀 【' + player.name + '】淘汰！"' + dialogue + '"', 'bad');
     renderSeats();
     const aliveCount = gameState.players.filter(p => p.alive).length;
-    if (aliveCount <= 1) { setTimeout(endGame, 800); return; }
+    if (aliveCount <= 1) { 
+      const winner = gameState.players.find(p => p.alive);
+      setTimeout(() => endGame(winner), 800); 
+      return; 
+    }
   } else if (isBullet) {
     const dialogue = getDialogue(player, 'survive');
     showBubble(player, dialogue);
@@ -1301,8 +1299,11 @@ function humanPass() {
   if (gameState.lastPlayerIdx === -1) return;
   const targetName = gameState.players[gameState.lastPlayerIdx]?.name || '上家';
   gameState.lastPlayerIdx = -1;
+  gameState.awaitingChallenge = false;
   addLog('💬 【你】选择不质疑 ' + targetName, 'dia');
-  advanceTurn();
+  // 不质疑 = 当前玩家继续出牌，不推进回合
+  renderSeats();
+  renderActions();
   nextTurn();
 }
 
@@ -1423,12 +1424,6 @@ function renderSeats() {
       info.appendChild(trustBox);
     }
 
-    // 对话气泡容器
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.id = 'bubble-' + p.id;
-
-    seat.appendChild(bubble);
     seat.appendChild(avatar);
     seat.appendChild(info);
     seat.appendChild(hpBox);
@@ -1481,18 +1476,9 @@ function getCardSuit(card) {
 
 function createPlayedCardElement(card) {
   const div = document.createElement('div');
-  const isJoker = card === 'Joker';
-  const suit = getCardSuit(card);
-  const colorClass = isJoker ? 'joker' : (suit === '♥' || suit === '♦' ? 'red' : 'black');
-  div.className = 'played-card ' + colorClass;
-
-  if (isJoker) {
-    div.innerHTML = '<span style="font-size:10px;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">JOKER</span>';
-  } else {
-    div.innerHTML = '<span class="card-corner top-left">' + card + '<br>' + suit + '</span>' +
-      '<span class="card-center">' + suit + '</span>' +
-      '<span class="card-corner bottom-right">' + card + '<br>' + suit + '</span>';
-  }
+  div.className = 'played-card';
+  // 始终显示牌背，隐藏真实牌面
+  div.innerHTML = '<span style="font-size:16px;color:rgba(201,169,110,0.6)">♠</span>';
   return div;
 }
 
@@ -1575,11 +1561,51 @@ function updateDisplay() {
 
 // ==================== 对话气泡 ====================
 function showBubble(player, text) {
-  const bubble = document.getElementById('bubble-' + player.id);
-  if (!bubble) return;
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return;
+
+  // 移除旧的同位置气泡
+  const oldId = 'bubble-' + player.id;
+  const oldBubble = document.getElementById(oldId);
+  if (oldBubble) oldBubble.remove();
+
+  // 创建新气泡
+  const bubble = document.createElement('div');
+  bubble.id = oldId;
+  bubble.className = 'bubble';
   bubble.textContent = text;
-  bubble.classList.add('show');
-  setTimeout(() => bubble.classList.remove('show'), 3500);
+  document.body.appendChild(bubble);
+
+  // 定位：基于 seat 位置，但朝向中心，确保不超出屏幕
+  requestAnimationFrame(() => {
+    const seatRect = seat.getBoundingClientRect();
+    const cx = seatRect.left + seatRect.width / 2;
+    const cy = seatRect.top + seatRect.height / 2;
+    const bw = 180; // max-width
+    const bh = 40;  // approx height
+
+    // 屏幕中心
+    const scrW = window.innerWidth;
+    const scrH = window.innerHeight;
+    const scrCx = scrW / 2;
+    const scrCy = scrH / 2;
+
+    // 朝向中心偏移
+    let tx = cx + (scrCx - cx) * 0.35;
+    let ty = cy + (scrCy - cy) * 0.35;
+
+    // 边界限制
+    tx = Math.max(bw / 2 + 10, Math.min(scrW - bw / 2 - 10, tx));
+    ty = Math.max(bh / 2 + 10, Math.min(scrH - bh / 2 - 10, ty));
+
+    bubble.style.left = tx + 'px';
+    bubble.style.top = ty + 'px';
+    bubble.classList.add('show');
+  });
+
+  setTimeout(() => {
+    if (bubble.parentNode) bubble.remove();
+  }, 3500);
 }
 
 function getDialogue(player, situation) {
