@@ -831,7 +831,7 @@ function nextTurn() {
   if (gameState.gameOver) return;
   gameState.humanPlayedThisTurn = false;
   const alivePlayers = gameState.players.filter(p => p.alive);
-  if (alivePlayers.length <= 1) { endGame(); return; }
+  if (alivePlayers.length <= 1) { endGame(alivePlayers[0]); return; }
   const current = gameState.players[gameState.currentPlayerIdx];
   if (!current.alive) { advanceTurn(); nextTurn(); return; }
   renderSeats();
@@ -856,10 +856,22 @@ function humanTurn(player) {
 // ==================== AI回合 ====================
 async function aiTurn(player) {
   if (gameState.gameOver) return;
+
+  // 显示思考中
+  showBubble(player, '思考中...');
+  addLog('🤖 【' + player.name + '】正在思考...', 'sys');
+
+  // 思考至少5秒（5000-6500ms随机，更自然）
+  await wait(5000 + Math.random() * 1500);
+
+  if (gameState.gameOver) return;
+
   const dialogue = getDialogue(player, 'play');
   showBubble(player, dialogue);
   addLog('💬 【' + player.name + '】"' + dialogue + '"', 'dia');
   await wait(600);
+
+  if (gameState.gameOver) return;
 
   const hand = player.hand;
   const target = gameState.targetCard;
@@ -903,26 +915,30 @@ async function aiTurn(player) {
     isLying = hand[0] !== target && hand[0] !== 'Joker';
   }
 
-  // 飞行动画：从AI头像飞向桌面
+  // 飞行动画：从AI头像飞向桌面（AI出牌显示牌背）
   animateCardsFromPlayer(player, chosen, () => {
+    if (gameState.gameOver) return;
     playCards(player, chosen, isLying);
 
     // 出牌后，下一位玩家进入质疑/出牌阶段
     const nextIdx = getNextAliveIndex(gameState.currentPlayerIdx);
     const nextPlayer = gameState.players[nextIdx];
-    gameState.currentPlayerIdx = nextIdx;
+    // 注意：此时不推进 currentPlayerIdx，质疑决策中根据 lastPlayerIdx 处理
 
     if (nextPlayer.isHuman) {
       // 等待人类决定是否质疑
       gameState.awaitingChallenge = true;
+      gameState.currentPlayerIdx = nextIdx; // 人类成为当前玩家
       addLog('❓ ' + nextPlayer.name + '，是否质疑？', 'chal');
       renderSeats();
       renderActions();
     } else {
-      // AI决定是否质疑
-      setTimeout(() => aiChallengeDecision(nextPlayer, player, chosen, isLying), 600);
+      // AI决定是否质疑（也思考3秒）
+      setTimeout(() => {
+        if (!gameState.gameOver) aiChallengeDecision(nextPlayer, player, chosen, isLying);
+      }, 3000);
     }
-  });
+  }, true); // true = 显示牌背
 }
 
 function getNextAliveIndex(idx) {
@@ -932,7 +948,7 @@ function getNextAliveIndex(idx) {
 }
 
 // ==================== 出牌动画 ====================
-function animateCardsFromPlayer(player, cards, callback) {
+function animateCardsFromPlayer(player, cards, callback, showBack) {
   const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
   const zone = document.getElementById('playZone');
   if (!seat || !zone) { callback(); return; }
@@ -947,7 +963,7 @@ function animateCardsFromPlayer(player, cards, callback) {
   let completed = 0;
   cards.forEach((card, i) => {
     setTimeout(() => {
-      const fly = createFlyingCard(card);
+      const fly = showBack ? createCardBackElement() : createFlyingCard(card);
 
       // 起点：玩家头像中心
       fly.style.left = (startX - 28) + 'px';
@@ -990,6 +1006,23 @@ function animateCardsFromPlayer(player, cards, callback) {
   });
 }
 
+function createCardBackElement() {
+  const fly = document.createElement('div');
+  fly.className = 'flying-card';
+  fly.style.width = '56px';
+  fly.style.height = '80px';
+  fly.style.borderRadius = '8px';
+  fly.style.background = 'linear-gradient(135deg, #3d2b1f, #2a1810)';
+  fly.style.border = '2px solid #c9a96e';
+  fly.style.display = 'flex';
+  fly.style.alignItems = 'center';
+  fly.style.justifyContent = 'center';
+  fly.style.fontSize = '10px';
+  fly.style.color = 'rgba(201,169,110,0.5)';
+  fly.innerHTML = '♠';
+  return fly;
+}
+
 function createFlyingCard(card) {
   const fly = document.createElement('div');
   const isJoker = card === 'Joker';
@@ -1011,6 +1044,8 @@ function createFlyingCard(card) {
 
 // ==================== 出牌 ====================
 function playCards(player, cards, isLying) {
+  if (gameState.gameOver) return;
+
   cards.forEach(c => {
     const idx = player.hand.indexOf(c);
     if (idx > -1) player.hand.splice(idx, 1);
@@ -1022,6 +1057,20 @@ function playCards(player, cards, isLying) {
   renderPlayedCards();
   renderHand();
   updateTension(isLying ? 15 : 5);
+
+  // 检查是否手牌清空 → 该玩家获胜
+  if (player.hand.length === 0) {
+    addLog('🎉 【' + player.name + '】手牌清空，获胜！', 'good');
+    endGame(player);
+    return;
+  }
+
+  // 检查是否只剩一名存活玩家
+  const aliveCount = gameState.players.filter(p => p.alive).length;
+  if (aliveCount <= 1) {
+    const winner = gameState.players.find(p => p.alive);
+    endGame(winner);
+  }
 }
 
 // ==================== 质疑 ====================
@@ -1047,14 +1096,22 @@ function aiChallengeDecision(challenger, targetPlayer, cards, isLying) {
     const dialogue = getDialogue(challenger, 'challenge');
     showBubble(challenger, dialogue);
     addLog('⚡ 【' + challenger.name + '】质疑！"' + dialogue + '"', 'chal');
-    setTimeout(() => resolveChallenge(challenger, targetPlayer, cards, isLying), 600);
+    gameState.awaitingChallenge = false;
+    setTimeout(() => {
+      if (!gameState.gameOver) {
+        resolveChallenge(challenger, targetPlayer, cards, isLying);
+      }
+    }, 600);
   } else {
     const dialogue = getDialogue(challenger, 'pass');
     showBubble(challenger, dialogue);
     addLog('💬 【' + challenger.name + '】"' + dialogue + '" (选择不质疑)', 'dia');
-    gameState.lastPlayerIdx = -1; // 重置，进入下一个人出牌
+    gameState.lastPlayerIdx = -1; // 重置质疑状态
+    gameState.awaitingChallenge = false;
     advanceTurn();
-    setTimeout(nextTurn, 400);
+    setTimeout(() => {
+      if (!gameState.gameOver) nextTurn();
+    }, 400);
   }
 }
 
@@ -1615,12 +1672,16 @@ function addLog(text, type) {
 }
 
 // ==================== 游戏结束 ====================
-function endGame() {
+function endGame(winner) {
   gameState.gameOver = true;
-  const winner = gameState.players.find(p => p.alive);
   const modal = document.getElementById('gameOverModal');
-  document.getElementById('gameOverTitle').textContent = winner ? '🎉 ' + winner.name + ' 获胜！' : '💀 全员淘汰';
-  document.getElementById('gameOverText').textContent = winner ? '恭喜' + winner.name + '成为最后的幸存者！' : '所有人都在酒馆倒下了...';
+  if (winner && winner.alive) {
+    document.getElementById('gameOverTitle').textContent = '🎉 ' + winner.name + ' 获胜！';
+    document.getElementById('gameOverText').textContent = '恭喜' + winner.name + '成为最后的幸存者！';
+  } else {
+    document.getElementById('gameOverTitle').textContent = '💀 全员淘汰';
+    document.getElementById('gameOverText').textContent = '所有人都在酒馆倒下了...';
+  }
   modal.classList.add('show');
   renderSeats();
   renderActions();
