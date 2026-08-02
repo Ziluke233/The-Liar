@@ -581,6 +581,64 @@ body {
 }
 @keyframes bulletTime { 0%{filter:brightness(1)} 50%{filter:brightness(1.5) sepia(0.3)} 100%{filter:brightness(1)} }
 
+/* ========== 惩罚结果弹窗 ========== */
+.penalty-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.5);
+  z-index: 950;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1.4);
+  text-align: center;
+  padding: 30px 60px;
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+}
+.penalty-popup.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.penalty-popup.hide {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+  transition: all 0.4s ease-in;
+}
+.penalty-popup.bullet {
+  background: rgba(120, 0, 0, 0.85);
+  border: 3px solid var(--accent-red);
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.6), 0 0 80px rgba(239, 68, 68, 0.3);
+}
+.penalty-popup.empty {
+  background: rgba(0, 80, 40, 0.85);
+  border: 3px solid var(--accent-green);
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
+}
+.penalty-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.penalty-title {
+  font-size: 36px;
+  font-weight: bold;
+  font-family: var(--font-main);
+  margin-bottom: 8px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+}
+.penalty-popup.bullet .penalty-title { color: #ff6666; }
+.penalty-popup.empty .penalty-title { color: #66ff99; }
+.penalty-desc {
+  font-size: 18px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.penalty-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+}
+
 /* ========== 响应式 ========== */
 @media (max-width: 900px) {
   .game-board { grid-template-columns: 160px 1fr 160px; }
@@ -689,8 +747,8 @@ body {
       <h3>俄罗斯轮盘</h3>
       <p>左轮手枪 6 个弹舱，随机 1 发实弹。每次扣动扳机：</p>
       <ul style="margin-left:16px;color:var(--text-secondary);font-size:12px;line-height:1.8">
-        <li>实弹（砰！）：HP -6，直接淘汰</li>
-        <li>空弹（咔...）：HP -1，继续存活</li>
+        <li>实弹（砰！）：直接淘汰，该玩家出局</li>
+        <li>空弹（咔...）：安全，继续游戏</li>
       </ul>
       <h3>胜利条件</h3>
       <p>活到最后，或率先<strong>出完所有手牌</strong>！</p>
@@ -814,6 +872,7 @@ function initGame() {
     hand: [],
     bulletPosition: Math.floor(Math.random() * GUN_CHAMBERS),
     currentBullet: 0,
+    bulletsFired: 0,
     trustLevels: {},
     lastLied: false,
     caughtLying: false,
@@ -903,6 +962,7 @@ function startRound() {
     if (p.alive) {
       p.bulletPosition = Math.floor(Math.random() * GUN_CHAMBERS);
       p.currentBullet = 0;
+      p.bulletsFired = 0;
     }
   });
   addLog('🎴 第' + gameState.roundCount + '轮开始！目标牌：' + gameState.targetCard, 'sys');
@@ -1006,11 +1066,12 @@ async function aiTurn(player) {
   animateCardsFromPlayer(player, chosen, () => {
     if (gameState.gameOver) return;
     playCards(player, chosen, isLying);
+    if (gameState.gameOver) return; // 手牌清空或存活<=1，游戏结束
 
     // 出牌后，下一位玩家进入质疑/出牌阶段
     const nextIdx = getNextAliveIndex(gameState.currentPlayerIdx);
     const nextPlayer = gameState.players[nextIdx];
-    // 注意：此时不推进 currentPlayerIdx，质疑决策中根据 lastPlayerIdx 处理
+    gameState.currentPlayerIdx = nextIdx; // 推进到下一位玩家（质疑者）
 
     if (nextPlayer.isHuman) {
       // 等待人类决定是否质疑
@@ -1234,18 +1295,23 @@ function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
 // ==================== 惩罚 ====================
 function performPenalty(player) {
   if (gameState.gameOver) return;
+  hideReactionModal(); // 确保反应弹窗关闭，不遮挡惩罚动画
   const chamber = player.currentBullet;
   const isBullet = chamber === player.bulletPosition;
   player.currentBullet = (player.currentBullet + 1) % GUN_CHAMBERS;
+  player.bulletsFired++;
 
-  addLog(isBullet ? '💥 砰！' + player.name + '中弹了！' : '🔘 咔...' + player.name + '安全', isBullet ? 'bad' : 'sys');
+  // 弹出醒目的惩罚结果提示
+  showPenaltyPopup(player, isBullet);
 
   if (isBullet) {
+    addLog('💥 砰！' + player.name + '中弹了！', 'bad');
     // 实弹：直接淘汰
     player.hp = 0;
     triggerDeathEffects(player);
   } else {
-    // 空弹：不扣HP，只扣减弹舱（currentBullet已+1）
+    addLog('🔘 咔...' + player.name + '安全', 'sys');
+    // 空弹：不扣HP，只推进弹舱指针（currentBullet已+1）
     const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
     if (seat) {
       seat.classList.add('flash-red');
@@ -1266,19 +1332,30 @@ function performPenalty(player) {
       setTimeout(() => endGame(winner), 800); 
       return; 
     }
-  } else if (isBullet) {
-    const dialogue = getDialogue(player, 'survive');
-    showBubble(player, dialogue);
-    addLog('😰 【' + player.name + '】"' + dialogue + '" (幸存)', 'dia');
+    // 死亡但不结束游戏：跳过死者，由下一位出牌
+    gameState.currentPlayerIdx = player.id;
+    advanceTurn();
+    renderSeats();
+    updateTension(-20);
+    setTimeout(() => {
+      if (!gameState.gameOver) startRound();
+    }, 1500);
+    return;
   }
 
-  // 惩罚结束后：下一轮从被惩罚者的下一位开始出牌
+  // 空弹：被惩罚者继续出牌（推进到下一位）
   gameState.currentPlayerIdx = player.id;
   advanceTurn();
 
   renderSeats();
   updateTension(isBullet ? -20 : -5);
-  setTimeout(() => { if (!gameState.gameOver) startRound(); }, isBullet ? 1200 : 600);
+  
+  const delay = 600;
+  setTimeout(() => {
+    if (!gameState.gameOver) {
+      nextTurn();
+    }
+  }, delay);
 }
 
 // ==================== 玩家操作 ====================
@@ -1304,6 +1381,7 @@ function confirmPlay() {
   // 人类出牌动画
   animateCardsFromPlayer(current, cards, () => {
     playCards(current, cards, isLying);
+    if (gameState.gameOver) return; // 手牌清空或存活<=1，游戏结束，不再继续
     gameState.humanPlayedThisTurn = true;
     gameState.selectedCards = [];
     renderHand();
@@ -1320,7 +1398,10 @@ function confirmPlay() {
       showReactionModal();
       // AI在反应选择后自动质疑决策
       setTimeout(() => {
-        aiChallengeDecision(nextPlayer, current, cards, isLying);
+        if (!gameState.gameOver) {
+          hideReactionModal();
+          aiChallengeDecision(nextPlayer, current, cards, isLying);
+        }
       }, 2000);
     }
   });
@@ -1347,11 +1428,13 @@ function humanPass() {
   const targetName = gameState.players[gameState.lastPlayerIdx]?.name || '上家';
   gameState.lastPlayerIdx = -1;
   gameState.awaitingChallenge = false;
+  gameState.selectedCards = [];
   addLog('💬 【你】选择不质疑 ' + targetName, 'dia');
-  // 不质疑 = 当前玩家继续出牌，不推进回合
+  // 不质疑 = 当前玩家出牌（已经是currentPlayerIdx，直接让轮到其出牌）
   renderSeats();
+  renderHand();
   renderActions();
-  nextTurn();
+  // 不需要推进currentPlayerIdx，已经是指向当前玩家了
 }
 
 // ==================== 反应选择 ====================
@@ -1470,7 +1553,17 @@ function renderSeats() {
       const ch = document.createElement('div');
       let cls = 'gun-ch';
       if (i === p.currentBullet) cls += ' current';
-      if (i < p.currentBullet) cls += ' spent';
+      if (p.bulletsFired > 0) {
+        // 已开过的弹舱位置（按currentBullet回绕计算）
+        let isSpent = false;
+        let pos = p.currentBullet - 1;
+        for (let s = 0; s < p.bulletsFired; s++) {
+          if (pos < 0) pos = GUN_CHAMBERS - 1;
+          if (i === pos) { isSpent = true; break; }
+          pos--;
+        }
+        if (isSpent) cls += ' spent';
+      }
       if (i === p.bulletPosition && !p.alive) cls += ' bullet';
       ch.className = cls;
       gunBox.appendChild(ch);
@@ -1740,6 +1833,47 @@ function getDialogue(player, situation) {
   return lines[Math.floor(Math.random() * lines.length)];
 }
 
+// ==================== 惩罚结果弹窗 ====================
+function showPenaltyPopup(player, isBullet) {
+  // 移除已有弹窗
+  const old = document.getElementById('penaltyPopup');
+  if (old) old.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'penaltyPopup';
+  popup.className = 'penalty-popup' + (isBullet ? ' bullet' : ' empty');
+
+  if (isBullet) {
+    popup.innerHTML = 
+      '<div class="penalty-icon">💥</div>' +
+      '<div class="penalty-title">砰！</div>' +
+      '<div class="penalty-desc">' + player.name + ' 中弹了！</div>' +
+      '<div class="penalty-sub">被淘汰出局</div>';
+  } else {
+    popup.innerHTML = 
+      '<div class="penalty-icon">🔘</div>' +
+      '<div class="penalty-title">咔...</div>' +
+      '<div class="penalty-desc">' + player.name + ' 安全！</div>' +
+      '<div class="penalty-sub">空弹，继续游戏</div>';
+  }
+
+  document.body.appendChild(popup);
+
+  // 触发入场动画
+  requestAnimationFrame(() => {
+    popup.classList.add('show');
+  });
+
+  // 1.8秒后自动移除
+  setTimeout(() => {
+    if (popup.parentNode) {
+      popup.classList.remove('show');
+      popup.classList.add('hide');
+      setTimeout(() => { if (popup.parentNode) popup.remove(); }, 400);
+    }
+  }, 1800);
+}
+
 // ==================== 特效 ====================
 function triggerScreenShake() {
   document.body.classList.add('shake');
@@ -1898,7 +2032,6 @@ function endGame(winner) {
   modal.classList.add('show');
   renderSeats();
   renderActions();
-  playSound('gameover');
 }
 
 // ==================== AI配置 ====================
