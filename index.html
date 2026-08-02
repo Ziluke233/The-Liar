@@ -125,6 +125,38 @@ body {
   border-color: var(--accent-gold);
   box-shadow: 0 0 16px rgba(251,191,36,0.4), 0 4px 12px rgba(0,0,0,0.5);
 }
+
+/* 下一位预备玩家蓝色框 */
+.seat.next-up .avatar-box {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 12px rgba(59,130,246,0.4), 0 4px 12px rgba(0,0,0,0.5);
+}
+.next-up-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+/* 当前出牌玩家金色箭头（从牌桌中心指向头像） */
+.turn-arrow {
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.turn-arrow svg {
+  filter: drop-shadow(0 0 6px rgba(251,191,36,0.6));
+}
 .avatar-box img {
   width: 100%;
   height: 100%;
@@ -857,13 +889,28 @@ function startGame(mode) {
 
 function startRound() {
   if (gameState.gameOver) return;
+  gameState.roundCount++;
   gameState.lastPlayedCards = [];
   gameState.lastPlayerIdx = -1;
   gameState.humanPlayedThisTurn = false;
   gameState.awaitingChallenge = false;
   gameState.selectedCards = [];
+  // 每轮重新洗牌、发牌、指定目标牌（官方规则：每轮重新发牌）
+  dealCards();
+  gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
+  // 重置存活玩家的弹舱（重新装弹）
+  gameState.players.forEach(p => {
+    if (p.alive) {
+      p.bulletPosition = Math.floor(Math.random() * GUN_CHAMBERS);
+      p.currentBullet = 0;
+    }
+  });
+  addLog('🎴 第' + gameState.roundCount + '轮开始！目标牌：' + gameState.targetCard, 'sys');
   renderPlayedCards();
   renderHand();
+  renderTarget();
+  renderSeats();
+  updateDisplay();
   nextTurn();
 }
 
@@ -1194,11 +1241,11 @@ function performPenalty(player) {
   addLog(isBullet ? '💥 砰！' + player.name + '中弹了！' : '🔘 咔...' + player.name + '安全', isBullet ? 'bad' : 'sys');
 
   if (isBullet) {
-    player.hp = Math.max(0, player.hp - 6);
+    // 实弹：直接淘汰
+    player.hp = 0;
     triggerDeathEffects(player);
   } else {
-    player.hp = Math.max(0, player.hp - 1);
-    // 非致命弹，也要给点视觉反馈
+    // 空弹：不扣HP，只扣减弹舱（currentBullet已+1）
     const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
     if (seat) {
       seat.classList.add('flash-red');
@@ -1350,12 +1397,31 @@ function applyReaction(type) {
 function renderSeats() {
   const board = document.getElementById('gameBoard');
   board.querySelectorAll('.seat').forEach(s => s.remove());
+  // 移除旧箭头
+  const oldArrow = document.getElementById('turnArrow');
+  if (oldArrow) oldArrow.remove();
+
+  // 计算下一位存活玩家
+  let nextIdx = -1;
+  if (gameState.gameStarted && !gameState.gameOver) {
+    nextIdx = getNextAliveIndex(gameState.currentPlayerIdx);
+  }
 
   gameState.players.forEach(p => {
+    const isActive = p.id === gameState.currentPlayerIdx && gameState.gameStarted && !gameState.gameOver;
+    const isNextUp = p.id === nextIdx && nextIdx !== gameState.currentPlayerIdx && p.alive;
     const seat = document.createElement('div');
-    seat.className = 'seat' + (p.id === gameState.currentPlayerIdx && gameState.gameStarted && !gameState.gameOver ? ' active' : '') + (!p.alive ? ' dead' : '');
+    seat.className = 'seat' + (isActive ? ' active' : '') + (isNextUp ? ' next-up' : '') + (!p.alive ? ' dead' : '');
     seat.dataset.pos = p.seatPos;
     seat.dataset.id = p.id;
+
+    // 下一位标签
+    if (isNextUp) {
+      const nextLabel = document.createElement('div');
+      nextLabel.className = 'next-up-label';
+      nextLabel.textContent = '下一位';
+      seat.appendChild(nextLabel);
+    }
 
     // 头像
     const avatar = document.createElement('div');
@@ -1431,6 +1497,62 @@ function renderSeats() {
 
     board.insertBefore(seat, board.querySelector('.center-area'));
   });
+
+  // 绘制当前出牌玩家的金色箭头（从牌桌中心指向头像）
+  if (gameState.gameStarted && !gameState.gameOver) {
+    const currentSeat = board.querySelector('.seat[data-id="' + gameState.currentPlayerIdx + '"]');
+    const centerArea = board.querySelector('.center-area');
+    if (currentSeat && centerArea) {
+      drawTurnArrow(centerArea, currentSeat);
+    }
+  }
+}
+
+// 绘制从中心指向当前玩家的金色箭头
+function drawTurnArrow(fromEl, toEl) {
+  const fromRect = fromEl.getBoundingClientRect();
+  const toRect = toEl.getBoundingClientRect();
+  const fromX = fromRect.left + fromRect.width / 2;
+  const fromY = fromRect.top + fromRect.height / 2;
+  const toX = toRect.left + toRect.width / 2;
+  const toY = toRect.top + toRect.height / 2;
+
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 1) return;
+
+  // 缩短箭头，使其在可见范围内，不覆盖头像和中心区
+  const startOffset = 50;  // 从中心向外偏移
+  const endOffset = 55;     // 距头像留出间距
+  const sx = fromX + (dx / dist) * startOffset;
+  const sy = fromY + (dy / dist) * startOffset;
+  const ex = toX - (dx / dist) * endOffset;
+  const ey = toY - (dy / dist) * endOffset;
+
+  const arrowLen = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+  if (arrowLen < 20) return; // 太短不画
+
+  const angle = Math.atan2(ey - sy, ex - sx) * 180 / Math.PI;
+
+  const arrow = document.createElement('div');
+  arrow.id = 'turnArrow';
+  arrow.className = 'turn-arrow';
+  arrow.style.position = 'fixed';
+  arrow.style.left = sx + 'px';
+  arrow.style.top = sy + 'px';
+  arrow.style.width = arrowLen + 'px';
+  arrow.style.height = '4px';
+  arrow.style.transformOrigin = '0 50%';
+  arrow.style.transform = 'rotate(' + angle + 'deg)';
+
+  // 金色线 + 箭头头部（用渐变和SVG三角）
+  arrow.innerHTML =
+    '<div style="width:100%;height:100%;background:linear-gradient(90deg,rgba(251,191,36,0.2),#fbbf24);border-radius:2px;box-shadow:0 0 8px rgba(251,191,36,0.6);"></div>' +
+    '<svg style="position:absolute;right:-10px;top:50%;transform:translateY(-50%);" width="14" height="14" viewBox="0 0 14 14">' +
+    '<polygon points="0,0 14,7 0,14" fill="#fbbf24" stroke="#f59e0b" stroke-width="1"/>' +
+    '</svg>';
+  document.body.appendChild(arrow);
 }
 
 function renderHand() {
@@ -1579,8 +1701,8 @@ function showBubble(player, text) {
   // 定位：基于 seat 位置，但朝向中心，确保不超出屏幕
   requestAnimationFrame(() => {
     const seatRect = seat.getBoundingClientRect();
-    const cx = seatRect.left + seatRect.width / 2;
-    const cy = seatRect.top + seatRect.height / 2;
+    const seatCx = seatRect.left + seatRect.width / 2;
+    const seatCy = seatRect.top + seatRect.height / 2;
     const bw = 180; // max-width
     const bh = 40;  // approx height
 
@@ -1590,9 +1712,13 @@ function showBubble(player, text) {
     const scrCx = scrW / 2;
     const scrCy = scrH / 2;
 
-    // 朝向中心偏移
-    let tx = cx + (scrCx - cx) * 0.35;
-    let ty = cy + (scrCy - cy) * 0.35;
+    // 气泡位置：靠近头像，从头像向屏幕中心方向偏移一小段距离
+    const dx = scrCx - seatCx;
+    const dy = scrCy - seatCy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const offset = 55; // 距头像中心的偏移量
+    let tx = seatCx + (dx / dist) * offset;
+    let ty = seatCy + (dy / dist) * offset;
 
     // 边界限制
     tx = Math.max(bw / 2 + 10, Math.min(scrW - bw / 2 - 10, tx));
@@ -1807,6 +1933,13 @@ function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ==================== 启动 ====================
 initGame();
+
+// 窗口大小变化时重绘箭头
+window.addEventListener('resize', () => {
+  if (gameState.gameStarted && !gameState.gameOver) {
+    renderSeats();
+  }
+});
 </script>
 </body>
 </html>
