@@ -325,8 +325,100 @@ body {
 .log-entry.good { color: var(--accent-green); }
 .log-entry.bad { color: var(--accent-red); font-weight: bold; }
 
-/* ========== 底部操作区 ========== */
-.bottom-panel {
+/* ========== 扑克牌 ========== */
+.playing-card {
+  width: 56px;
+  height: 80px;
+  background: linear-gradient(135deg, #f5e6d3, #e8d5c4);
+  border: 2px solid #c9a96e;
+  border-radius: 8px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+  color: #2a1810;
+  font-family: var(--font-main);
+  user-select: none;
+}
+.playing-card:hover { transform: translateY(-4px); box-shadow: 0 4px 16px rgba(251,191,36,0.3); border-color: #d97706; }
+.playing-card.selected {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 16px rgba(251,191,36,0.5), 0 4px 12px rgba(0,0,0,0.4);
+  background: linear-gradient(135deg, #fff3d6, #f5e6d3);
+}
+.playing-card .card-corner {
+  position: absolute;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1.1;
+  text-align: center;
+  color: inherit;
+}
+.playing-card .card-corner .suit { font-size: 12px; }
+.playing-card .card-corner.top-left { top: 3px; left: 3px; }
+.playing-card .card-corner.bottom-right { bottom: 3px; right: 3px; transform: rotate(180deg); }
+.playing-card .card-center {
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.playing-card.red { color: #c41e3a; }
+.playing-card.black { color: #1a1a1a; }
+.playing-card.joker {
+  background: linear-gradient(135deg, #2a1f15, #1a1210);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+.playing-card.joker .card-center { font-size: 22px; }
+.playing-card.joker .joker-text {
+  position: absolute;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* 已出牌区 */
+.play-zone { min-height: 60px; display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.played-card {
+  width: 44px;
+  height: 62px;
+  background: linear-gradient(135deg, #f5e6d3, #e8d5c4);
+  border: 2px solid #c9a96e;
+  border-radius: 6px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  animation: cardIn 0.3s ease;
+  font-family: var(--font-main);
+}
+.played-card .card-corner {
+  position: absolute;
+  font-size: 8px;
+  font-weight: bold;
+  line-height: 1;
+  text-align: center;
+}
+.played-card .card-corner.top-left { top: 2px; left: 2px; }
+.played-card .card-corner.bottom-right { bottom: 2px; right: 2px; transform: rotate(180deg); }
+.played-card .card-center { font-size: 20px; }
+.played-card.red { color: #c41e3a; }
+.played-card.black { color: #1a1a1a; }
+.played-card.joker {
+  background: linear-gradient(135deg, #2a1f15, #1a1210);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+.played-card.joker .card-center { font-size: 16px; }
+@keyframes cardIn { from { opacity:0; transform:scale(0.5) translateY(-20px); } to { opacity:1; transform:scale(1) translateY(0); } }
   background: linear-gradient(180deg, #0c0a09, #1c1917);
   border-top: 2px solid var(--border-gold);
   padding: 10px 24px;
@@ -338,26 +430,6 @@ body {
 }
 .hand-label { font-size: 13px; color: var(--text-secondary); }
 .hand-wrap { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-.hand-card {
-  width: 56px;
-  height: 78px;
-  background: linear-gradient(135deg, #3f3a35, #1c1917);
-  border: 2px solid var(--border-gold);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  font-weight: bold;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-  user-select: none;
-}
-.hand-card:hover { transform: translateY(-4px); border-color: var(--accent-gold); box-shadow: 0 4px 12px rgba(251,191,36,0.3); }
-.hand-card.selected { border-color: var(--accent-gold); background: linear-gradient(135deg, #4a3f2a, #2a2420); box-shadow: 0 0 12px rgba(251,191,36,0.4); }
-
 /* 按钮 */
 .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .btn {
@@ -803,9 +875,14 @@ async function aiTurn(player) {
 
   const nextIdx = getNextAliveIndex(gameState.currentPlayerIdx);
   const nextPlayer = gameState.players[nextIdx];
+  
+  // 先推进到质疑者，再渲染质疑按钮
+  gameState.currentPlayerIdx = nextIdx;
+  
   if (nextPlayer.isHuman) {
     gameState.awaitingChallenge = true;
     addLog('❓ ' + nextPlayer.name + '，是否质疑？', 'chal');
+    renderSeats();
     renderActions();
   } else {
     setTimeout(() => aiChallengeDecision(nextPlayer, player, chosen, isLying), 600);
@@ -957,18 +1034,19 @@ function passTurn() {
 }
 
 function humanChallenge() {
-  if (!gameState.awaitingChallenge) return;
-  gameState.awaitingChallenge = false;
+  if (gameState.lastPlayerIdx === -1) return;
   const target = gameState.players[gameState.lastPlayerIdx];
   const challenger = gameState.players[gameState.currentPlayerIdx];
+  gameState.lastPlayerIdx = -1; // 重置
   addLog('⚡ 【你】质疑 ' + target.name + '！', 'chal');
   resolveChallenge(challenger, target, gameState.lastPlayedCards, target.lastLied);
 }
 
 function humanPass() {
-  if (!gameState.awaitingChallenge) return;
-  gameState.awaitingChallenge = false;
-  addLog('💬 【你】选择不质疑', 'dia');
+  if (gameState.lastPlayerIdx === -1) return;
+  const targetName = gameState.players[gameState.lastPlayerIdx]?.name || '上家';
+  gameState.lastPlayerIdx = -1; // 重置
+  addLog('💬 【你】选择不质疑 ' + targetName, 'dia');
   advanceTurn();
   nextTurn();
 }
@@ -1114,14 +1192,54 @@ function renderHand() {
   if (!gameState.gameStarted) { label.textContent = '等待游戏开始...'; return; }
   if (gameState.gameOver) { label.textContent = '游戏结束'; return; }
   if (!human.alive) { label.textContent = '你已淘汰'; return; }
-  label.textContent = '你的手牌 (' + human.hand.length + '张):';
+  label.textContent = '你的手牌 (' + human.hand.length + '张)' + (gameState.targetCard ? ' - 目标牌: ' + gameState.targetCard : '') + ':';
   human.hand.forEach((card, i) => {
-    const div = document.createElement('div');
-    div.className = 'hand-card' + (gameState.selectedCards.includes(i) ? ' selected' : '');
-    div.textContent = card;
-    div.onclick = () => selectCard(i);
-    wrap.appendChild(div);
+    wrap.appendChild(createCardElement(card, i, gameState.selectedCards.includes(i)));
   });
+}
+
+function createCardElement(card, index, isSelected) {
+  const div = document.createElement('div');
+  const isJoker = card === 'Joker';
+  const suit = getCardSuit(card);
+  const colorClass = isJoker ? 'joker' : (suit === '♥' || suit === '♦' ? 'red' : 'black');
+  div.className = 'playing-card ' + colorClass + (isSelected ? ' selected' : '');
+
+  if (isJoker) {
+    div.innerHTML = '<span class="joker-text">JOKER</span>';
+  } else {
+    div.innerHTML = '<span class="card-corner top-left">' + card + '<br><span class="suit">' + suit + '</span></span>' +
+      '<span class="card-center">' + suit + '</span>' +
+      '<span class="card-corner bottom-right">' + card + '<br><span class="suit">' + suit + '</span></span>';
+  }
+
+  if (index !== undefined) {
+    div.onclick = () => selectCard(index);
+  }
+  return div;
+}
+
+function getCardSuit(card) {
+  if (card === 'Joker') return '';
+  const suits = ['♠', '♥', '♣', '♦'];
+  return suits[Math.abs(card.charCodeAt(0) * 7 + card.length * 3) % 4];
+}
+
+function createPlayedCardElement(card) {
+  const div = document.createElement('div');
+  const isJoker = card === 'Joker';
+  const suit = getCardSuit(card);
+  const colorClass = isJoker ? 'joker' : (suit === '♥' || suit === '♦' ? 'red' : 'black');
+  div.className = 'played-card ' + colorClass;
+
+  if (isJoker) {
+    div.innerHTML = '<span class="joker-text" style="font-size:10px;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">JOKER</span>';
+  } else {
+    div.innerHTML = '<span class="card-corner top-left">' + card + '<br>' + suit + '</span>' +
+      '<span class="card-center">' + suit + '</span>' +
+      '<span class="card-corner bottom-right">' + card + '<br>' + suit + '</span>';
+  }
+  return div;
 }
 
 function renderActions() {
@@ -1134,10 +1252,12 @@ function renderActions() {
   const current = gameState.players[gameState.currentPlayerIdx];
   if (!current.isHuman) return;
 
-  if (gameState.awaitingChallenge) {
+  // 如果上家出了牌，当前玩家是下家 -> 质疑阶段
+  if (gameState.lastPlayerIdx !== -1 && gameState.lastPlayerIdx !== current.id) {
     area.innerHTML = '<button class="btn btn-red" onclick="humanChallenge()">质疑!</button><button class="btn btn-green" onclick="humanPass()">不质疑</button>';
-  } else if (!gameState.humanPlayedThisTurn) {
-    area.innerHTML = '<button class="btn btn-gold" onclick="confirmPlay()" id="btnPlay">出牌</button><button class="btn" style="border-color:var(--text-dim);color:var(--text-dim)" onclick="passTurn()">跳过</button>';
+  } else {
+    // 出牌阶段（上家没出牌，或当前玩家是第一个）
+    area.innerHTML = '<button class="btn btn-gold" onclick="confirmPlay()" id="btnPlay">出牌</button>';
     document.getElementById('btnPlay').disabled = gameState.selectedCards.length === 0;
   }
 }
@@ -1157,10 +1277,7 @@ function renderPlayedCards() {
   const zone = document.getElementById('playZone');
   zone.innerHTML = '';
   gameState.lastPlayedCards.forEach(card => {
-    const div = document.createElement('div');
-    div.className = 'played-card';
-    div.textContent = card;
-    zone.appendChild(div);
+    zone.appendChild(createPlayedCardElement(card));
   });
 }
 
