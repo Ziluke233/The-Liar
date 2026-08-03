@@ -617,12 +617,17 @@ body {
   color: #2a1810;
   font-family: var(--font-main);
   user-select: none;
-  animation: cardEnter 0.4s ease-out backwards;
 }
 @keyframes cardEnter {
   0% { opacity: 0; transform: translateY(26px) scale(0.8) rotate(-6deg); }
   60% { opacity: 1; transform: translateY(-4px) scale(1.04) rotate(2deg); }
   100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+/* 发牌/重开一轮：从左往右 3s 铺开发牌 */
+@keyframes cardDeal {
+  0%   { opacity: 0; transform: translateX(-32px) scale(0.55) rotate(-8deg); }
+  60%  { opacity: 1; transform: translateX(4px) scale(1.05) rotate(2deg); }
+  100% { opacity: 1; transform: translateX(0) scale(1) rotate(0); }
 }
 .playing-card:hover {
   transform: translateY(-6px) scale(1.06);
@@ -1571,7 +1576,7 @@ function startGame(mode) {
   gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
   addLog('🎯 目标牌：' + gameState.targetCard, 'sys');
   renderSeats();
-  renderHand();
+  renderHand(true);
   renderTarget();
   renderActions();
   renderTension();
@@ -1593,7 +1598,7 @@ function startRound() {
   gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
   addLog('🎴 第' + gameState.roundCount + '轮开始！目标牌：' + gameState.targetCard, 'sys');
   renderPlayedCards();
-  renderHand();
+  renderHand(true);
   renderTarget();
   renderSeats();
   updateDisplay();
@@ -2225,7 +2230,7 @@ function renderSeats() {
 
 }
 
-function renderHand() {
+function renderHand(isDeal) {
   const wrap = document.getElementById('handWrap');
   const label = document.getElementById('handLabel');
   wrap.innerHTML = '';
@@ -2234,12 +2239,17 @@ function renderHand() {
   if (gameState.gameOver) { label.textContent = '游戏结束'; return; }
   if (!human.alive) { label.textContent = '你已淘汰'; return; }
   label.textContent = '你的手牌 (' + human.hand.length + '张)' + (gameState.targetCard ? ' - 目标牌: ' + gameState.targetCard : '') + ':';
+  const count = human.hand.length;
+  const stepMs = count > 1 ? Math.round(3000 / count) : 0;
   human.hand.forEach((card, i) => {
-    wrap.appendChild(createCardElement(card, i, gameState.selectedCards.includes(i)));
+    const anim = isDeal
+      ? { name: 'cardDeal', delay: i * stepMs }
+      : { name: 'cardEnter' };
+    wrap.appendChild(createCardElement(card, i, gameState.selectedCards.includes(i), anim));
   });
 }
 
-function createCardElement(card, index, isSelected) {
+function createCardElement(card, index, isSelected, anim) {
   const div = document.createElement('div');
   const isJoker = card === 'Joker';
   const suit = getCardSuit(card);
@@ -2256,6 +2266,16 @@ function createCardElement(card, index, isSelected) {
 
   if (index !== undefined) {
     div.onclick = () => selectCard(index);
+  }
+
+  // 入场动画：发牌时从左往右逐张铺开，其余情况用 cardEnter 弹出
+  if (anim && anim.name) {
+    div.style.animation = anim.name + ' 0.5s ease-out backwards';
+    if (anim.delay) div.style.animationDelay = anim.delay + 'ms';
+    div.addEventListener('animationend', function () {
+      div.style.animation = '';
+      div.style.animationDelay = '';
+    }, { once: true });
   }
   return div;
 }
