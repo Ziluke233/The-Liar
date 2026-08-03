@@ -1899,7 +1899,6 @@ function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChal
     }, 600);
   } else {
     const dialogue = getDialogue(challenger, 'pass');
-    showBubble(challenger, '不质疑', 'pass');
     showNotice(challenger.name + ' 不质疑', 'pass');
     addLog('💬 【' + challenger.name + '】"' + dialogue + '" (选择不质疑)', 'dia');
     gameState.lastPlayerIdx = -1; // 清除质疑状态
@@ -2054,7 +2053,7 @@ function humanPass() {
   gameState.selectedCards = [];
   addLog('💬 【你】选择不质疑 ' + targetName, 'dia');
   const player = gameState.players[0];
-  showBubble(player, '不质疑', 'pass');
+  // 不质疑只保留对决记录，不弹浮层气泡
   // 不质疑 = 当前玩家出牌（已经是currentPlayerIdx，直接让轮到其出牌）
   renderSeats();
   renderHand();
