@@ -1849,7 +1849,7 @@ function showBubble(player, text) {
 }
 
 function getDialogue(player, situation) {
-  const pool = DIALOGUE_POOL[player.personality];
+  const pool = DIALOGUE_POOL[player.personality] || {};
   const lines = pool[situation] || ['...'];
   return lines[Math.floor(Math.random() * lines.length)];
 }
