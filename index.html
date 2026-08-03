@@ -2484,6 +2484,14 @@ function showPenaltyPopup(player, isBullet) {
 
   document.body.appendChild(popup);
 
+  // 以游戏牌桌中心为定位点，而非屏幕中心
+  const board = document.getElementById('gameBoard');
+  if (board) {
+    const rect = board.getBoundingClientRect();
+    popup.style.top = (rect.top + rect.height / 2) + 'px';
+    popup.style.left = (rect.left + rect.width / 2) + 'px';
+  }
+
   // 触发入场动画
   requestAnimationFrame(() => {
     popup.classList.add('show');
