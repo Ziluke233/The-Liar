@@ -2792,7 +2792,8 @@ function playPenaltySequence(player, isBullet) {
       fireGun(gun);
       showAvatarSymbol(isBullet ? 'skull' : 'shield', player);
       triggerAvatarParticles(isBullet ? 'skull' : 'shield', player);
-      showPenaltyPopup(player, isBullet);
+      // 等护盾/骷髅与枪动画播放约 2s 后再弹出结算弹窗
+      setTimeout(() => { showPenaltyPopup(player, isBullet); }, 2000);
 
       if (isBullet) {
         triggerAvatarBlood(player); // 中弹：头像持续溅射红色粒子 3s
