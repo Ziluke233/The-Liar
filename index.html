@@ -116,16 +116,16 @@ body {
   transition: opacity 0.3s;
 }
 .seat.dead { opacity: 0.4; filter: grayscale(1); }
-.seat[data-pos="top"] { grid-area: top; justify-self: center; }
+.seat[data-pos="top"] { grid-area: top; justify-self: center; margin-bottom: 16px; }
 .seat[data-pos="left"] { grid-area: left; justify-self: center; align-self: center; }
 .seat[data-pos="right"] { grid-area: right; justify-self: center; align-self: center; }
-.seat[data-pos="bottom"] { grid-area: bottom; justify-self: center; }
+.seat[data-pos="bottom"] { grid-area: bottom; justify-self: center; margin-top: 16px; }
 
 /* 头像框 */
 .avatar-box {
-  width: 84px;
-  height: 84px;
-  border-radius: 16px;
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
   border: 3px solid var(--border-gold);
   background: #1a1520;
   display: flex;
@@ -1013,8 +1013,11 @@ body {
   .top-info { gap:8px; }
   .log-panel { width:clamp(180px,24vw,220px); }
   .game-board { grid-template-columns:clamp(108px,14vw,160px) minmax(0,1fr) clamp(108px,14vw,160px); }
-  .avatar-box { width:68px; height:68px; }
+  .avatar-box { width:64px; height:64px; }
   .info-panel { min-width:84px; padding-inline:6px; }
+  .playing-card { width:50px; height:72px; }
+  .hand-wrap { gap: 6px; }
+  .hand-section { padding: 6px 12px; }
 }
 @media (max-height:720px) {
   .top-bar { padding-block:5px; }
@@ -1032,6 +1035,10 @@ body {
   .log-body { padding:6px 10px; }
   .top-info span:nth-child(n+3) { display:none; }
   .game-title .sub { display:none; }
+  .avatar-box { width:48px; height:48px; }
+  .info-panel { min-width: auto; padding: 3px 4px; }
+  .playing-card { width:42px; height:60px; }
+  .hand-section { max-width: 100%; padding: 4px 8px; }
 }
 
 </style>
