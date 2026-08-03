@@ -361,28 +361,25 @@ body {
   color: #90ee90;
 }
 
-/* 左下角通知区：放在底部面板上方，避免遮挡牌桌 */
+/* 左上角通知区 */
 .notice-area {
   position: fixed;
+  top: 56px;
   left: 8px;
-  bottom: 172px;
-  top: auto;
   z-index: 80;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 170px;
-  max-width: 170px;
-  max-height: 132px;
+  width: 176px;
+  max-width: 176px;
   pointer-events: none;
-  background: rgba(12, 10, 9, 0.55);
-  border: 1px solid rgba(161, 98, 7, 0.22);
+  background: rgba(12, 10, 9, 0.7);
+  border: 1px solid rgba(161, 98, 7, 0.25);
   border-radius: 10px;
   padding: 8px;
   padding-top: 24px;
   backdrop-filter: blur(8px);
-  box-shadow: 0 -4px 18px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.2);
-  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 .notice-area::before {
   content: '⚡ 对决记录';
@@ -410,17 +407,17 @@ body {
   font-weight: bold;
   backdrop-filter: blur(4px);
   opacity: 0;
-  transform: translateY(14px) scale(0.94);
-  transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1.3);
+  transform: translateX(-16px) scale(0.92);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1.4);
   margin-top: 2px;
 }
 .notice-item.show {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(0) scale(1);
 }
 .notice-item.hide {
   opacity: 0;
-  transform: translateY(-10px) scale(0.92);
+  transform: translateX(10px) scale(0.9);
   transition: all 0.25s ease-in;
 }
 .notice-item.challenge {
@@ -722,11 +719,20 @@ body {
 .log-entry.good { color: var(--accent-green); }
 .log-entry.bad { color: var(--accent-red); font-weight: bold; }
 
-/* ========== 底部操作区 ========== */
+/* ========== 底部操作区（骗子酒馆吧台风格） ========== */
 .bottom-panel {
   background:
-    linear-gradient(180deg, rgba(12,10,9,0.95), rgba(28,25,23,0.95)),
-    radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.06) 0%, transparent 60%);
+    /* 扑克花色水印 */
+    url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2780%27%20height=%2780%27%3E%3Ctext%20x=%2712%27%20y=%2726%27%20font-size=%2718%27%20fill=%27%23a16207%27%20opacity=%270.16%27%3E♠%3C/text%3E%3Ctext%20x=%2746%27%20y=%2726%27%20font-size=%2718%27%20fill=%27%23a16207%27%20opacity=%270.12%27%3E♥%3C/text%3E%3Ctext%20x=%2712%27%20y=%2764%27%20font-size=%2718%27%20fill=%27%23a16207%27%20opacity=%270.12%27%3E♦%3C/text%3E%3Ctext%20x=%2746%27%20y=%2764%27%20font-size=%2718%27%20fill=%27%23a16207%27%20opacity=%270.16%27%3E♣%3C/text%3E%3C/svg%3E"),
+    /* 顶部辉光 */
+    radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.10) 0%, transparent 55%),
+    /* 竖向木板缝隙 */
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 70px),
+    /* 横向木纹 */
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 30px),
+    /* 底色 */
+    linear-gradient(180deg, rgba(16,12,10,0.98), rgba(34,26,21,0.98));
+  background-size: 80px 80px, 100% 100%, 70px 70px, 30px 30px, 100% 100%;
   border-top: 2px solid var(--border-gold);
   padding: 10px 24px;
   display: flex;
@@ -736,29 +742,35 @@ body {
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
+  box-shadow:
+    inset 0 12px 40px rgba(0,0,0,0.55),
+    0 -8px 28px rgba(0,0,0,0.45);
 }
-/* 底部面板装饰 */
+/* 顶部黄铜装饰条 */
 .bottom-panel::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 5%;
-  right: 5%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(251,191,36,0.15), transparent);
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, rgba(251,191,36,0.55) 20%, #fbbf24 50%, rgba(251,191,36,0.55) 80%, transparent 100%);
+  box-shadow: 0 2px 12px rgba(251,191,36,0.25);
   pointer-events: none;
 }
+/* 底部花色装饰带 */
 .bottom-panel::after {
-  content: '';
+  content: '♠  ♥  ♦  ♣';
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 50%;
   transform: translateX(-50%);
-  width: 40px;
-  height: 2px;
-  border-radius: 1px;
-  background: rgba(251,191,36,0.15);
+  font-size: 12px;
+  letter-spacing: 10px;
+  color: rgba(251,191,36,0.12);
+  white-space: nowrap;
   pointer-events: none;
+  user-select: none;
 }
 /* 底部手牌区域外围装饰容器 */
 .hand-section {
@@ -1032,6 +1044,112 @@ body {
 }
 @keyframes bulletTime { 0%{filter:brightness(1)} 50%{filter:brightness(1.5) sepia(0.3)} 100%{filter:brightness(1)} }
 
+/* ========== 开枪特效：指向目标的枪 ========== */
+.gun-aimer {
+  position: fixed;
+  width: 110px;
+  height: 56px;
+  z-index: 920;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.7));
+  opacity: 0;
+  animation: gunAimIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.4) forwards;
+}
+.gun-aimer.fire {
+  animation: gunAimIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.4) forwards,
+             gunRecoil 0.18s ease-out 0.45s forwards;
+}
+.gun-aimer svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.muzzle-flash {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #ffcc00 30%, rgba(255,100,0,0) 70%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 921;
+}
+.muzzle-flash.flash {
+  animation: muzzleFlash 0.22s ease-out forwards;
+}
+@keyframes gunAimIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.55) rotate(var(--gun-rot, 0deg)); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(var(--gun-rot, 0deg)); }
+}
+@keyframes gunRecoil {
+  0% { transform: translate(-50%, -50%) scale(1) rotate(var(--gun-rot, 0deg)); }
+  35% { transform: translate(-50%, -50%) scale(1.12) rotate(calc(var(--gun-rot, 0deg) - 7deg)); }
+  100% { transform: translate(-50%, -50%) scale(1) rotate(var(--gun-rot, 0deg)); }
+}
+@keyframes muzzleFlash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.4); }
+  60% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+}
+
+/* ========== 屏幕中心符号：空枪盾牌 / 中弹骷髅 ========== */
+.center-symbol {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 960;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+  animation: symbolPop 3s ease forwards;
+}
+.center-symbol.shield {
+  background: radial-gradient(circle at 40% 40%, rgba(74,222,128,0.18), transparent 65%);
+  border: 2px solid rgba(74,222,128,0.45);
+  box-shadow: 0 0 40px rgba(34,197,94,0.35), inset 0 0 30px rgba(34,197,94,0.15);
+}
+.center-symbol.skull {
+  background: radial-gradient(circle at 40% 40%, rgba(248,113,113,0.18), transparent 65%);
+  border: 2px solid rgba(239,68,68,0.45);
+  box-shadow: 0 0 50px rgba(239,68,68,0.45), inset 0 0 30px rgba(239,68,68,0.15);
+}
+.center-symbol .symbol-icon {
+  font-size: 96px;
+  line-height: 1;
+  filter: drop-shadow(0 0 18px currentColor);
+}
+.center-symbol.shield .symbol-icon { color: #4ade80; }
+.center-symbol.skull .symbol-icon { color: #ff6666; }
+.center-symbol::after {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255,255,255,0.12);
+  animation: symbolRing 2s linear infinite;
+}
+@keyframes symbolPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0) rotate(-25deg); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.2) rotate(6deg); }
+  20% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+}
+@keyframes symbolRing {
+  0% { transform: scale(1); opacity: 0.25; }
+  50% { opacity: 0.08; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
 /* ========== 惩罚结果弹窗 ========== */
 .penalty-popup {
   position: fixed;
@@ -1110,7 +1228,6 @@ body {
   .info-panel { padding-block:3px; }
   .bottom-panel { padding-block:5px; }
   .playing-card { width:46px; height:66px; }
-  .notice-area { bottom: 150px; max-height: 110px; }
 }
 @media (max-width:720px) {
   .game-main { flex-direction:column; }
@@ -1123,14 +1240,13 @@ body {
   .info-panel { min-width: auto; padding: 3px 4px; }
   .playing-card { width:42px; height:60px; }
   .hand-section { max-width: 100%; padding: 4px 8px; }
-  .notice-area { left: auto; right: 8px; bottom: 150px; width: 150px; max-height: 110px; }
 }
 
 </style>
 </head>
 <body>
 
-<!-- 左下角通知区 -->
+<!-- 左上角通知区 -->
 <div class="notice-area" id="noticeArea"></div>
 
 <!-- 顶部栏 -->
@@ -1791,7 +1907,7 @@ function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChal
   }
 }
 
-function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
+async function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
   if (gameState.gameOver) return;
   const allValid = cards.every(c => c === gameState.targetCard || c === 'Joker');
 
@@ -1820,7 +1936,7 @@ function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
 }
 
 // ==================== 惩罚 ====================
-function performPenalty(player) {
+async function performPenalty(player) {
   if (gameState.gameOver) return;
   hideReactionModal();
   const chamber = player.currentBullet;
@@ -1828,11 +1944,8 @@ function performPenalty(player) {
   player.currentBullet = (player.currentBullet + 1) % GUN_CHAMBERS;
   player.bulletsFired++;
 
-  try {
-    showPenaltyPopup(player, isBullet);
-  } catch (error) {
-    console.error('showPenaltyPopup failed:', error);
-  }
+  // 先播放开枪动画序列（枪指向玩家 + 屏幕中心符号 3s）
+  await playPenaltySequence(player, isBullet);
 
   if (isBullet) {
     addLog('💥 砰！' + player.name + '中弹了！', 'bad');
@@ -1849,16 +1962,6 @@ function performPenalty(player) {
     addLog('💀 【' + player.name + '】淘汰！"' + dialogue + '"', 'bad');
   } else {
     addLog('🔘 咔...' + player.name + '安全，本轮结束', 'sys');
-    const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
-    if (seat) {
-      seat.classList.add('flash-red');
-      setTimeout(() => seat.classList.remove('flash-red'), 400);
-    }
-    try {
-      triggerParticles(player, 8);
-    } catch (error) {
-      console.error('triggerParticles failed:', error);
-    }
   }
 
   gameState.lastPlayerIdx = -1;
@@ -2278,40 +2381,42 @@ function showBubble(player, text, type) {
   }
   document.body.appendChild(bubble);
 
-  // 定位：基于座位位置，在头像旁边固定方向显示
+  // 定位：基于座位位置，在头像/座位旁边固定方向显示，避免贴近顶部标题栏
   requestAnimationFrame(() => {
     const avatar = seat.querySelector('.avatar-box');
-    const refEl = avatar || seat;
-    const refRect = refEl.getBoundingClientRect();
+    const seatRect = seat.getBoundingClientRect();
+    const avatarRect = avatar ? avatar.getBoundingClientRect() : seatRect;
     const bw = 180;
     const bh = 50;
     const scrW = window.innerWidth;
     const scrH = window.innerHeight;
     const pos = seat.dataset.pos;
+    const TOP_BAR_H = 56; // 顶部栏高度参考值
 
     let tx, ty;
     const pad = 12; // 与头像的间距
 
     if (pos === 'top') {
-      tx = refRect.left + refRect.width / 2;
-      ty = refRect.bottom + pad + bh / 2;
+      // 顶部玩家气泡放在整个座位下方，避免压在标题栏上
+      tx = seatRect.left + seatRect.width / 2;
+      ty = seatRect.bottom + pad + bh / 2;
     } else if (pos === 'bottom') {
-      tx = refRect.left + refRect.width / 2;
-      ty = refRect.top - pad - bh / 2;
+      tx = avatarRect.left + avatarRect.width / 2;
+      ty = avatarRect.top - pad - bh / 2;
     } else if (pos === 'left') {
-      tx = refRect.right + pad + bw / 2;
-      ty = refRect.top + refRect.height / 2;
+      tx = avatarRect.right + pad + bw / 2;
+      ty = avatarRect.top + avatarRect.height / 2;
     } else if (pos === 'right') {
-      tx = refRect.left - pad - bw / 2;
-      ty = refRect.top + refRect.height / 2;
+      tx = avatarRect.left - pad - bw / 2;
+      ty = avatarRect.top + avatarRect.height / 2;
     } else {
-      tx = refRect.left + refRect.width / 2;
-      ty = refRect.top - pad - bh / 2;
+      tx = avatarRect.left + avatarRect.width / 2;
+      ty = avatarRect.top - pad - bh / 2;
     }
 
-    // 边界限制
+    // 边界限制：x 不超出屏幕，y 不低于顶部栏
     tx = Math.max(bw / 2 + 5, Math.min(scrW - bw / 2 - 5, tx));
-    ty = Math.max(bh / 2 + 5, Math.min(scrH - bh / 2 - 5, ty));
+    ty = Math.max(TOP_BAR_H + bh / 2 + 8, Math.min(scrH - bh / 2 - 5, ty));
 
     bubble.style.left = tx + 'px';
     bubble.style.top = ty + 'px';
@@ -2325,7 +2430,7 @@ function showBubble(player, text, type) {
   }, duration);
 }
 
-// ==================== 左下角通知 ====================
+// ==================== 左上角通知 ====================
 function showNotice(text, type) {
   const area = document.getElementById('noticeArea');
   if (!area) return;
@@ -2512,6 +2617,148 @@ function triggerParticles(player, count, type) {
     document.body.appendChild(p);
     setTimeout(() => p.remove(), 1200);
   }
+}
+
+// ==================== 开枪与中心符号特效 ====================
+function aimGunAt(player) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return null;
+  const avatar = seat.querySelector('.avatar-box');
+  const rect = avatar ? avatar.getBoundingClientRect() : seat.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const halfSize = Math.max(rect.width, rect.height) / 2;
+  const pos = seat.dataset.pos;
+
+  const gun = document.createElement('div');
+  gun.className = 'gun-aimer';
+  gun.innerHTML =
+    '<svg viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg">' +
+    '<defs>' +
+    '<linearGradient id="gunMetal" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#2a2a2a"/><stop offset="50%" stop-color="#555"/><stop offset="100%" stop-color="#2a2a2a"/></linearGradient>' +
+    '<linearGradient id="gunGrip" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5c3a21"/><stop offset="100%" stop-color="#2e1b0f"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="34" y="20" width="74" height="14" rx="3" fill="#3a3a3a" stroke="#777" stroke-width="1"/>' +
+    '<rect x="36" y="22" width="68" height="10" rx="2" fill="url(#gunMetal)"/>' +
+    '<circle cx="38" cy="27" r="12" fill="#3a3a3a" stroke="#777" stroke-width="1"/>' +
+    '<circle cx="38" cy="27" r="5" fill="#1a1a1a"/>' +
+    '<path d="M24 24 L10 24 L4 50 Q3 55 10 55 L26 55 Q30 55 30 48 L32 32 Z" fill="url(#gunGrip)" stroke="#8b5a2b" stroke-width="1"/>' +
+    '<path d="M34 34 Q42 34 42 42 Q42 48 34 48" fill="none" stroke="#777" stroke-width="2"/>' +
+    '<path d="M36 38 Q40 38 40 42" fill="none" stroke="#aaa" stroke-width="2"/>' +
+    '<path d="M20 20 L16 8 L24 8 Z" fill="#555"/>' +
+    '<rect x="104" y="16" width="4" height="4" fill="#aaa"/>' +
+    '</svg>';
+
+  const gap = 12;
+  const gunHalf = 55;
+  const dist = halfSize + gunHalf + gap;
+  let rot = 0, dirX = 1, dirY = 0;
+
+  if (pos === 'top') { rot = -90; dirX = 0; dirY = -1; }
+  else if (pos === 'bottom') { rot = 90; dirX = 0; dirY = 1; }
+  else if (pos === 'left') { rot = 180; dirX = -1; dirY = 0; }
+  else { rot = 0; dirX = 1; dirY = 0; }
+
+  const gx = cx - dirX * dist;
+  const gy = cy - dirY * dist;
+  const mx = cx + dirX * (halfSize + gap);
+  const my = cy + dirY * (halfSize + gap);
+
+  gun.style.left = gx + 'px';
+  gun.style.top = gy + 'px';
+  gun.style.setProperty('--gun-rot', rot + 'deg');
+  gun.dataset.mx = mx;
+  gun.dataset.my = my;
+  gun.dataset.dirX = dirX;
+  gun.dataset.dirY = dirY;
+
+  document.body.appendChild(gun);
+  return gun;
+}
+
+function fireGun(gun) {
+  if (!gun) return;
+  gun.classList.add('fire');
+  const mx = parseFloat(gun.dataset.mx);
+  const my = parseFloat(gun.dataset.my);
+  const flash = document.createElement('div');
+  flash.className = 'muzzle-flash flash';
+  flash.style.left = mx + 'px';
+  flash.style.top = my + 'px';
+  document.body.appendChild(flash);
+  setTimeout(() => flash.remove(), 250);
+}
+
+function showCenterSymbol(type) {
+  const old = document.getElementById('centerSymbol');
+  if (old) old.remove();
+  const symbol = document.createElement('div');
+  symbol.id = 'centerSymbol';
+  symbol.className = 'center-symbol ' + type;
+  symbol.innerHTML = '<div class="symbol-icon">' + (type === 'shield' ? '🛡' : '☠') + '</div>';
+  document.body.appendChild(symbol);
+  setTimeout(() => { if (symbol.parentNode) symbol.remove(); }, 3000);
+}
+
+function triggerCenterParticles(type) {
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const count = type === 'shield' ? 36 : 48;
+  const colors = type === 'shield'
+    ? ['#4ade80', '#22c55e', '#fbbf24', '#86efac']
+    : ['#ff4444', '#ff6666', '#7f1d1d', '#fbbf24', '#555'];
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = cx + 'px';
+    p.style.top = cy + 'px';
+    const size = 3 + Math.random() * 5;
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.boxShadow = '0 0 6px ' + p.style.background;
+
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 60 + Math.random() * 160;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    p.animate([
+      { transform: 'translate(0,0) scale(1)', opacity: 1 },
+      { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.3)', opacity: 0 }
+    ], { duration: 700 + Math.random() * 700, easing: 'cubic-bezier(0.15,0.6,0.3,1)' });
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1500);
+  }
+}
+
+function playPenaltySequence(player, isBullet) {
+  return new Promise(resolve => {
+    const gun = aimGunAt(player);
+    setTimeout(() => {
+      fireGun(gun);
+      showCenterSymbol(isBullet ? 'skull' : 'shield');
+      triggerCenterParticles(isBullet ? 'skull' : 'shield');
+      showPenaltyPopup(player, isBullet);
+
+      if (isBullet) {
+        triggerScreenShake();
+        document.body.classList.add('bullet-time');
+        setTimeout(() => document.body.classList.remove('bullet-time'), 300);
+      } else {
+        const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+        if (seat) {
+          seat.classList.add('flash-red');
+          setTimeout(() => seat.classList.remove('flash-red'), 400);
+        }
+      }
+
+      setTimeout(() => {
+        if (gun && gun.parentNode) gun.remove();
+        resolve();
+      }, 3000);
+    }, 450);
+  });
 }
 
 function updateTension(delta) {
