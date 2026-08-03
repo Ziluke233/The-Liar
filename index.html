@@ -138,7 +138,11 @@ body {
 }
 .seat.active .avatar-box {
   border-color: var(--accent-gold);
-  box-shadow: 0 0 16px rgba(251,191,36,0.4), 0 4px 12px rgba(0,0,0,0.5);
+  animation: seatPulse 1.6s ease-in-out infinite;
+}
+@keyframes seatPulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(251,191,36,0.35), 0 4px 12px rgba(0,0,0,0.5); }
+  50% { box-shadow: 0 0 30px rgba(251,191,36,0.8), 0 4px 12px rgba(0,0,0,0.5); }
 }
 
 /* 下一位预备玩家蓝色框 */
@@ -296,7 +300,7 @@ body {
   pointer-events: none;
   box-shadow: 0 4px 12px rgba(0,0,0,0.6);
   line-height: 1.4;
-  transition: opacity 0.3s, transform 0.3s;
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.56,0.64,1);
   transform: translate(-50%, -50%) scale(0.8);
 }
 .bubble.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -330,8 +334,8 @@ body {
 .bubble.thinking .thinking-dots .dot:nth-child(2) { animation-delay: 0.2s; }
 .bubble.thinking .thinking-dots .dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes dotBounce {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1.3); }
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0) scale(0.8); }
+  40% { opacity: 1; transform: translateY(-4px) scale(1.35); }
 }
 
 /* 质疑气泡（红色脉冲+振动） */
@@ -339,9 +343,14 @@ body {
   border-color: var(--accent-red);
   background: linear-gradient(135deg, rgba(60,20,20,0.95), rgba(30,10,10,0.95));
   box-shadow: 0 0 24px rgba(239,68,68,0.4), 0 4px 12px rgba(0,0,0,0.6);
-  animation: challengeShake 0.5s ease-in-out;
+  animation: challengeShake 0.5s ease-in-out, challengeFlash 0.7s ease-out;
   color: #ff9999;
   font-weight: bold;
+}
+@keyframes challengeFlash {
+  0% { box-shadow: 0 0 0 rgba(239,68,68,0), 0 4px 12px rgba(0,0,0,0.6); }
+  30% { box-shadow: 0 0 38px rgba(239,68,68,0.85), 0 4px 12px rgba(0,0,0,0.6); }
+  100% { box-shadow: 0 0 24px rgba(239,68,68,0.4), 0 4px 12px rgba(0,0,0,0.6); }
 }
 @keyframes challengeShake {
   0%, 100% { transform: translate(-50%, -50%) scale(1); }
@@ -555,7 +564,17 @@ body {
 /* 紧张度 */
 .tension-wrap { width: 160px; }
 .tension-bar { height: 8px; background: #3f3a35; border-radius: 4px; overflow: hidden; border: 1px solid #2a2622; }
-.tension-fill { height: 100%; background: var(--accent-green); border-radius: 4px; transition: all 0.5s; }
+.tension-fill { height: 100%; background: var(--accent-green); border-radius: 4px; transition: all 0.5s; position: relative; overflow: hidden; }
+.tension-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+  transform: translateX(-100%);
+  animation: tensionShimmer 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes tensionShimmer { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(200%); } }
 .tension-label { text-align: center; font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 
 /* 出牌区 */
@@ -571,6 +590,7 @@ body {
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
   font-family: var(--font-main);
+  animation: cardIn 0.4s cubic-bezier(0.2,0.9,0.3,1.3) both;
 }
 .played-card .card-corner {
   position: absolute;
@@ -612,8 +632,9 @@ body {
   animation: cardEnter 0.4s ease-out backwards;
 }
 @keyframes cardEnter {
-  0% { opacity: 0; transform: translateY(20px) scale(0.8); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% { opacity: 0; transform: translateY(26px) scale(0.8) rotate(-6deg); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.04) rotate(2deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
 }
 .playing-card:hover {
   transform: translateY(-6px) scale(1.06);
@@ -818,26 +839,76 @@ body {
 .hand-label { font-size: 13px; color: var(--text-secondary); }
 .hand-wrap { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; position: relative; }
 
-/* 按钮 */
-.actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+/* 按钮：悬浮弹出式，脱离文档流，不再挤压上方布局 */
+.actions {
+  position: fixed;
+  left: 50%;
+  bottom: 160px;                 /* 由 JS 按底部面板高度动态修正，确保贴合手牌区上方 */
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(92vw, 640px);
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(30,24,17,0.94), rgba(14,11,9,0.94));
+  border: 1px solid rgba(251,191,36,0.35);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.6), inset 0 0 18px rgba(251,191,36,0.06);
+  backdrop-filter: blur(8px);
+  pointer-events: none;          /* 容器不拦截点击，按钮再恢复，避免遮挡牌桌操作 */
+  animation: actionPop 0.4s cubic-bezier(0.2,0.9,0.3,1.25) both;
+}
+.actions:empty { display: none; }
+.actions > * { pointer-events: auto; }
+.actions .btn { animation: actionBtnIn 0.42s cubic-bezier(0.2,0.9,0.3,1.35) both; }
+.actions .btn:nth-child(2) { animation-delay: 0.06s; }
+.actions .btn:nth-child(3) { animation-delay: 0.12s; }
+@keyframes actionPop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(22px) scale(0.92); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes actionBtnIn {
+  0% { opacity: 0; transform: translateY(16px) scale(0.85); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
 .btn {
-  padding: 8px 20px;
-  border-radius: 8px;
+  padding: 9px 22px;
+  border-radius: 10px;
   border: 2px solid;
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.18s, box-shadow 0.18s, background 0.18s, color 0.18s;
   font-family: var(--font-ui);
+  position: relative;
+  overflow: hidden;
 }
+.btn::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -130%;
+  width: 60%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.4), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+.btn:hover { transform: translateY(-3px) scale(1.05); }
 .btn-gold { background: var(--bg-card); border-color: var(--border-gold); color: var(--accent-gold); }
-.btn-gold:hover { background: var(--border-gold); color: var(--bg-primary); }
+.btn-gold:hover { background: var(--border-gold); color: var(--bg-primary); box-shadow: 0 8px 22px rgba(251,191,36,0.45); }
+.btn-gold:hover::after { animation: btnSheen 0.7s ease; }
 .btn-red { background: var(--bg-card); border-color: var(--accent-red); color: var(--accent-red); }
-.btn-red:hover { background: var(--accent-red); color: white; }
+.btn-red:hover { background: var(--accent-red); color: white; box-shadow: 0 8px 22px rgba(239,68,68,0.45); }
+.btn-red:hover::after { animation: btnSheen 0.7s ease; }
 .btn-green { background: var(--bg-card); border-color: var(--accent-green); color: var(--accent-green); }
-.btn-green:hover { background: var(--accent-green); color: var(--bg-primary); }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-green:hover { background: var(--accent-green); color: var(--bg-primary); box-shadow: 0 8px 22px rgba(34,197,94,0.45); }
+.btn-green:hover::after { animation: btnSheen 0.7s ease; }
+.btn:active { transform: translateY(-1px) scale(0.96); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 .forced-notice { display:inline-flex; align-items:center; padding:6px 10px; border:1px solid rgba(239,68,68,.55); border-radius:999px; color:#fecaca; background:rgba(127,29,29,.25); font-size:12px; }
+@keyframes btnSheen { from { left: -130%; } to { left: 140%; } }
 
 /* ========== 弹窗 ========== */
 .modal-overlay {
@@ -850,6 +921,11 @@ body {
   z-index: 1000;
 }
 .modal-overlay.show { display: flex; }
+.modal-overlay.show .modal { animation: modalIn 0.4s cubic-bezier(0.2,0.9,0.3,1.2) both; }
+@keyframes modalIn {
+  0% { opacity: 0; transform: translateY(18px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
 .modal {
   background: var(--bg-panel);
   border: 2px solid var(--border-gold);
@@ -2133,11 +2209,19 @@ function createPlayedCardElement(card) {
   return div;
 }
 
+function positionActionBar() {
+  const area = document.getElementById('actionArea');
+  const panel = document.getElementById('bottomPanel');
+  if (area && panel) area.style.bottom = (panel.offsetHeight + 14) + 'px';
+}
+window.addEventListener('resize', positionActionBar);
+
 function renderActions() {
   const area = document.getElementById('actionArea');
   area.innerHTML = '';
   if (!gameState.gameStarted || gameState.gameOver) {
     area.innerHTML = '<button class="btn btn-gold" onclick="showModeModal()">开始游戏</button>';
+    positionActionBar();
     return;
   }
   const current = gameState.players[gameState.currentPlayerIdx];
@@ -2148,6 +2232,7 @@ function renderActions() {
     area.innerHTML = gameState.forcedChallenge
       ? '<span class="forced-notice">本轮只剩一名玩家持牌，必须质疑</span><button class="btn btn-red" onclick="humanChallenge()">质疑!</button>'
       : '<button class="btn btn-red" onclick="humanChallenge()">质疑!</button><button class="btn btn-green" onclick="humanPass()">不质疑</button>';
+    positionActionBar();
     return;
   }
 
@@ -2158,6 +2243,7 @@ function renderActions() {
   btn.disabled = gameState.selectedCards.length === 0;
   btn.onclick = confirmPlay;
   area.appendChild(btn);
+  positionActionBar();
 }
 
 function renderTarget() {
