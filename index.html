@@ -1045,25 +1045,32 @@ body {
 @keyframes bulletTime { 0%{filter:brightness(1)} 50%{filter:brightness(1.5) sepia(0.3)} 100%{filter:brightness(1)} }
 
 /* ========== 开枪特效：指向目标的枪 ========== */
-.gun-aimer {
+.gun-pos {
   position: fixed;
-  width: 110px;
-  height: 56px;
+  width: 132px;
+  height: 88px;
   z-index: 920;
   pointer-events: none;
   transform: translate(-50%, -50%);
-  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.7));
   opacity: 0;
   animation: gunAimIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.4) forwards;
 }
-.gun-aimer.fire {
+.gun-pos.recoil {
   animation: gunAimIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.4) forwards,
-             gunRecoil 0.18s ease-out 0.45s forwards;
+             gunRecoil 0.24s ease-out 0.45s forwards;
 }
-.gun-aimer svg {
+.gun-aimer {
+  width: 100%;
+  height: 100%;
+  transform: rotate(calc(var(--gun-base, 0deg) + var(--gun-rot, 0deg)));
+  transform-origin: center;
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.75));
+}
+.gun-img {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: contain;
 }
 .muzzle-flash {
   position: absolute;
@@ -1080,13 +1087,13 @@ body {
   animation: muzzleFlash 0.22s ease-out forwards;
 }
 @keyframes gunAimIn {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.55) rotate(var(--gun-rot, 0deg)); }
-  100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(var(--gun-rot, 0deg)); }
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.55); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 @keyframes gunRecoil {
-  0% { transform: translate(-50%, -50%) scale(1) rotate(var(--gun-rot, 0deg)); }
-  35% { transform: translate(-50%, -50%) scale(1.12) rotate(calc(var(--gun-rot, 0deg) - 7deg)); }
-  100% { transform: translate(-50%, -50%) scale(1) rotate(var(--gun-rot, 0deg)); }
+  0% { transform: translate(-50%, -50%) translateY(0); }
+  35% { transform: translate(-50%, -50%) translateY(-12px); }
+  100% { transform: translate(-50%, -50%) translateY(0); }
 }
 @keyframes muzzleFlash {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
@@ -2631,26 +2638,12 @@ function aimGunAt(player) {
   const pos = seat.dataset.pos;
 
   const gun = document.createElement('div');
-  gun.className = 'gun-aimer';
-  gun.innerHTML =
-    '<svg viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg">' +
-    '<defs>' +
-    '<linearGradient id="gunMetal" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#2a2a2a"/><stop offset="50%" stop-color="#555"/><stop offset="100%" stop-color="#2a2a2a"/></linearGradient>' +
-    '<linearGradient id="gunGrip" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5c3a21"/><stop offset="100%" stop-color="#2e1b0f"/></linearGradient>' +
-    '</defs>' +
-    '<rect x="34" y="20" width="74" height="14" rx="3" fill="#3a3a3a" stroke="#777" stroke-width="1"/>' +
-    '<rect x="36" y="22" width="68" height="10" rx="2" fill="url(#gunMetal)"/>' +
-    '<circle cx="38" cy="27" r="12" fill="#3a3a3a" stroke="#777" stroke-width="1"/>' +
-    '<circle cx="38" cy="27" r="5" fill="#1a1a1a"/>' +
-    '<path d="M24 24 L10 24 L4 50 Q3 55 10 55 L26 55 Q30 55 30 48 L32 32 Z" fill="url(#gunGrip)" stroke="#8b5a2b" stroke-width="1"/>' +
-    '<path d="M34 34 Q42 34 42 42 Q42 48 34 48" fill="none" stroke="#777" stroke-width="2"/>' +
-    '<path d="M36 38 Q40 38 40 42" fill="none" stroke="#aaa" stroke-width="2"/>' +
-    '<path d="M20 20 L16 8 L24 8 Z" fill="#555"/>' +
-    '<rect x="104" y="16" width="4" height="4" fill="#aaa"/>' +
-    '</svg>';
+  gun.className = 'gun-pos';
+  gun.innerHTML = '<div class="gun-aimer"><img class="gun-img" src="assets/desert_eagle.svg" alt=""></div>';
 
   const gap = 12;
-  const gunHalf = 55;
+  const gunHalf = 64;
+  const GUN_BASE_ROT = 0; // 若沙鹰SVG枪口朝向相反，改为 180
   const dist = halfSize + gunHalf + gap;
   let rot = 0, dirX = 1, dirY = 0;
 
@@ -2661,11 +2654,12 @@ function aimGunAt(player) {
 
   const gx = cx - dirX * dist;
   const gy = cy - dirY * dist;
-  const mx = cx + dirX * (halfSize + gap);
-  const my = cy + dirY * (halfSize + gap);
+  const mx = cx - dirX * (halfSize + gap);
+  const my = cy - dirY * (halfSize + gap);
 
   gun.style.left = gx + 'px';
   gun.style.top = gy + 'px';
+  gun.style.setProperty('--gun-base', GUN_BASE_ROT + 'deg');
   gun.style.setProperty('--gun-rot', rot + 'deg');
   gun.dataset.mx = mx;
   gun.dataset.my = my;
@@ -2678,7 +2672,7 @@ function aimGunAt(player) {
 
 function fireGun(gun) {
   if (!gun) return;
-  gun.classList.add('fire');
+  gun.classList.add('recoil');
   const mx = parseFloat(gun.dataset.mx);
   const my = parseFloat(gun.dataset.my);
   const flash = document.createElement('div');
@@ -2689,21 +2683,37 @@ function fireGun(gun) {
   setTimeout(() => flash.remove(), 250);
 }
 
-function showCenterSymbol(type) {
+function showAvatarSymbol(type, player) {
   const old = document.getElementById('centerSymbol');
   if (old) old.remove();
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  const avatar = seat ? seat.querySelector('.avatar-box') : null;
+  const rect = avatar ? avatar.getBoundingClientRect()
+    : { left: window.innerWidth / 2 - 40, top: window.innerHeight / 2 - 40, width: 80, height: 80 };
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const size = Math.max(80, rect.width * 1.4);
+
   const symbol = document.createElement('div');
   symbol.id = 'centerSymbol';
   symbol.className = 'center-symbol ' + type;
-  symbol.innerHTML = '<div class="symbol-icon">' + (type === 'shield' ? '🛡' : '☠') + '</div>';
+  symbol.style.left = cx + 'px';
+  symbol.style.top = cy + 'px';
+  symbol.style.width = size + 'px';
+  symbol.style.height = size + 'px';
+  symbol.innerHTML = '<div class="symbol-icon" style="font-size:' + (size * 0.6) + 'px;">' + (type === 'shield' ? '🛡' : '☠') + '</div>';
   document.body.appendChild(symbol);
   setTimeout(() => { if (symbol.parentNode) symbol.remove(); }, 3000);
 }
 
-function triggerCenterParticles(type) {
-  const cx = window.innerWidth / 2;
-  const cy = window.innerHeight / 2;
-  const count = type === 'shield' ? 36 : 48;
+function triggerAvatarParticles(type, player) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return;
+  const avatar = seat.querySelector('.avatar-box');
+  const rect = avatar ? avatar.getBoundingClientRect() : seat.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const count = type === 'shield' ? 30 : 42;
   const colors = type === 'shield'
     ? ['#4ade80', '#22c55e', '#fbbf24', '#86efac']
     : ['#ff4444', '#ff6666', '#7f1d1d', '#fbbf24', '#555'];
@@ -2720,7 +2730,7 @@ function triggerCenterParticles(type) {
     p.style.boxShadow = '0 0 6px ' + p.style.background;
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 60 + Math.random() * 160;
+    const dist = 40 + Math.random() * (type === 'shield' ? 120 : 150);
     const dx = Math.cos(angle) * dist;
     const dy = Math.sin(angle) * dist;
     p.animate([
@@ -2732,16 +2742,53 @@ function triggerCenterParticles(type) {
   }
 }
 
+function triggerAvatarBlood(player) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return;
+  const avatar = seat.querySelector('.avatar-box');
+  const rect = avatar ? avatar.getBoundingClientRect() : seat.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const colors = ['#ff4444', '#ff6666', '#cc0000', '#a01010'];
+  const start = Date.now();
+  const timer = setInterval(() => {
+    if (Date.now() - start > 3000) { clearInterval(timer); return; }
+    const n = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = cx + 'px';
+      p.style.top = cy + 'px';
+      const size = 3 + Math.random() * 5;
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.boxShadow = '0 0 6px ' + p.style.background;
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 30 + Math.random() * 90;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist + 60;
+      p.animate([
+        { transform: 'translate(0,0) scale(1)', opacity: 1 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.2)', opacity: 0 }
+      ], { duration: 600 + Math.random() * 500, easing: 'cubic-bezier(0.2,0.6,0.4,1)' });
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 1200);
+    }
+  }, 120);
+}
+
 function playPenaltySequence(player, isBullet) {
   return new Promise(resolve => {
     const gun = aimGunAt(player);
     setTimeout(() => {
       fireGun(gun);
-      showCenterSymbol(isBullet ? 'skull' : 'shield');
-      triggerCenterParticles(isBullet ? 'skull' : 'shield');
+      showAvatarSymbol(isBullet ? 'skull' : 'shield', player);
+      triggerAvatarParticles(isBullet ? 'skull' : 'shield', player);
       showPenaltyPopup(player, isBullet);
 
       if (isBullet) {
+        triggerAvatarBlood(player); // 中弹：头像持续溅射红色粒子 3s
         triggerScreenShake();
         document.body.classList.add('bullet-time');
         setTimeout(() => document.body.classList.remove('bullet-time'), 300);
@@ -2753,6 +2800,7 @@ function playPenaltySequence(player, isBullet) {
         }
       }
 
+      // 枪动画与盾牌/骷髅符号动画均播放完毕后再推进后续流程
       setTimeout(() => {
         if (gun && gun.parentNode) gun.remove();
         resolve();
