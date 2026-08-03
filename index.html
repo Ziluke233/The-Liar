@@ -944,6 +944,69 @@ body {
   cursor: default;
 }
 .side-info .side-sub::-webkit-scrollbar { display: none; }
+.side-info .opp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-top: 2px;
+}
+.side-info .opp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.28);
+  white-space: nowrap;
+}
+.side-info .opp-row .opp-name {
+  color: rgba(255,255,255,0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 64px;
+}
+.side-info .opp-row .opp-count {
+  color: #ffb4b4;
+  font-weight: 700;
+  margin-left: 6px;
+}
+.side-info .opp-empty {
+  font-size: 10px;
+  color: rgba(255,255,255,0.45);
+}
+.side-info .stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-top: 2px;
+}
+.side-info .stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.28);
+  white-space: nowrap;
+}
+.side-info .stat-label {
+  color: rgba(255,255,255,0.7);
+}
+.side-info .stat-num {
+  color: var(--accent-gold);
+  font-weight: 800;
+  font-size: 15px;
+  margin: 0 2px;
+  text-shadow: 0 0 10px rgba(251,191,36,0.3);
+}
+.side-info .stat-unit {
+  color: rgba(255,255,255,0.5);
+  font-size: 10px;
+}
 
 /* 按钮：悬浮弹出式，脱离文档流，不再挤压上方布局 */
 .actions {
@@ -1591,11 +1654,13 @@ body {
 <!-- 底部操作区 -->
 <div class="bottom-panel" id="bottomPanel">
   <div class="side-info left" id="targetInfo">
-    <div class="side-icon">🎯</div>
-    <div class="side-title">目标牌</div>
-    <div class="side-value"><span id="claimedCount">0</span><span class="side-total">/6</span></div>
-    <div class="side-note">场上已宣称</div>
-    <div class="side-sub">本局共 6 张</div>
+    <div class="side-icon">⚔️</div>
+    <div class="side-title">揭穿统计</div>
+    <div class="stat-list">
+      <div class="stat-row"><span class="stat-label">质疑</span><span class="stat-num" id="statChallenge">0</span><span class="stat-unit">次</span></div>
+      <div class="stat-row"><span class="stat-label">揭穿</span><span class="stat-num" id="statExpose">0</span><span class="stat-unit">次</span></div>
+    </div>
+    <div class="side-sub">本局累计</div>
   </div>
 
   <div class="hand-section">
@@ -1609,11 +1674,9 @@ body {
   </div>
 
   <div class="side-info right" id="gunInfo">
-    <div class="side-icon">🔫</div>
-    <div class="side-title">你的枪</div>
-    <div class="side-value"><span id="gunChance">6</span><span class="side-total">/6</span></div>
-    <div class="side-note">剩余安全发数</div>
-    <div class="side-sub" id="opponentCards">对手牌数</div>
+    <div class="side-icon">👥</div>
+    <div class="side-title">对手手牌</div>
+    <div class="opp-list" id="opponentCards">对手牌数</div>
   </div>
 </div>
 
@@ -1778,7 +1841,8 @@ let gameState = {
   currentPlayerIdx: 0,
   lastPlayerIdx: -1,
   lastPlayedCards: [],
-  pileCount: 0,
+  challengeCount: 0,
+  lieExposedCount: 0,
   roundCount: 0,
   gameStarted: false,
   gameOver: false,
@@ -1805,7 +1869,6 @@ function initGame() {
     hp: MAX_HP,
     alive: true,
     hand: [],
-    bulletPosition: Math.floor(Math.random() * GUN_CHAMBERS),
     currentBullet: 0,
     bulletsFired: 0,
     trustLevels: {},
@@ -1821,7 +1884,8 @@ function initGame() {
   gameState.currentPlayerIdx = Math.floor(Math.random() * MAX_PLAYERS);
   gameState.lastPlayerIdx = -1;
   gameState.lastPlayedCards = [];
-  gameState.pileCount = 0;
+  gameState.challengeCount = 0;
+  gameState.lieExposedCount = 0;
   gameState.roundCount = 0;
   gameState.gameStarted = false;
   gameState.gameOver = false;
@@ -1889,7 +1953,6 @@ function startRound() {
   if (gameState.gameOver) return;
   gameState.roundCount++;
   gameState.lastPlayedCards = [];
-  gameState.pileCount = 0;
   gameState.lastPlayerIdx = -1;
   gameState.humanPlayedThisTurn = false;
   gameState.awaitingChallenge = false;
@@ -2159,12 +2222,12 @@ function playCards(player, cards, isLying) {
     if (idx > -1) player.hand.splice(idx, 1);
   });
   gameState.lastPlayedCards = [...cards];
-  gameState.pileCount += cards.length;
   gameState.lastPlayerIdx = player.id;
   player.lastLied = isLying;
   addLog('🃏 【' + player.name + '】打出 ' + cards.length + ' 张牌 (宣称是 ' + gameState.targetCard + ')', 'act');
   renderPlayedCards();
   renderHand();
+  updateDisplay();
   updateTension(isLying ? 15 : 5);
 
   // 手牌清空只代表本轮暂时跳过，不代表整局获胜。
@@ -2231,6 +2294,10 @@ async function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
   if (gameState.gameOver) return;
   const allValid = cards.every(c => c === gameState.targetCard || c === 'Joker');
 
+  // 累计本局统计
+  gameState.challengeCount++;
+  if (!allValid || wasLying) gameState.lieExposedCount++;
+
   // 无论质疑结果如何，都重置质疑状态
   gameState.lastPlayerIdx = -1;
   gameState.awaitingChallenge = false;
@@ -2253,14 +2320,20 @@ async function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
     // 质疑者被惩罚
     performPenalty(challenger);
   }
+  updateDisplay();
 }
 
 // ==================== 惩罚 ====================
 async function performPenalty(player) {
   if (gameState.gameOver) return;
   hideReactionModal();
-  const chamber = player.currentBullet;
-  const isBullet = chamber === player.bulletPosition;
+  const shotNum = player.currentBullet + 1; // 第几枪（1-indexed）
+  let isBullet;
+  if (shotNum >= GUN_CHAMBERS) {
+    isBullet = true; // 第六枪必死
+  } else {
+    isBullet = Math.random() < 0.5; // 前 5 枪各二分之一概率
+  }
   player.currentBullet = (player.currentBullet + 1) % GUN_CHAMBERS;
   player.bulletsFired++;
 
@@ -2505,7 +2578,7 @@ function renderSeats() {
         }
         if (isSpent) cls += ' spent';
       }
-      if (i === p.bulletPosition && !p.alive) cls += ' bullet';
+      if (i === GUN_CHAMBERS - 1) cls += ' lethal'; // 第六枪必死
       ch.className = cls;
       gunBox.appendChild(ch);
     }
@@ -2708,33 +2781,25 @@ function updateSideInfo() {
   if (!gameState.gameStarted || gameState.gameOver) {
     targetInfo.style.opacity = '0.45';
     gunInfo.style.opacity = '0.45';
-    document.getElementById('claimedCount').textContent = '0';
-    document.getElementById('gunChance').textContent = '6';
-    document.getElementById('opponentCards').textContent = '对手牌数';
+    document.getElementById('statChallenge').textContent = '0';
+    document.getElementById('statExpose').textContent = '0';
+    document.getElementById('opponentCards').innerHTML = '<div class="opp-empty">对手牌数</div>';
     return;
   }
   targetInfo.style.opacity = '1';
   gunInfo.style.opacity = '1';
 
-  // 左侧：场上宣称的目标牌数 / 本局目标牌总数
-  const claimed = gameState.pileCount || 0;
-  const targetTotal = gameState.targetCard ? 6 : 0; // 每轮 Q/K/A 各 6 张
-  document.getElementById('claimedCount').textContent = claimed;
-  targetInfo.querySelector('.side-total').textContent = '/' + targetTotal;
+  // 左侧：本局揭穿统计（质疑次数 / 被揭穿=抓到说谎次数）
+  document.getElementById('statChallenge').textContent = gameState.challengeCount || 0;
+  document.getElementById('statExpose').textContent = gameState.lieExposedCount || 0;
 
-  // 右侧：自己枪剩余安全发数 + 对手剩余手牌
-  const human = gameState.players[0];
-  const remaining = human && human.alive
-    ? (human.bulletPosition - human.currentBullet + GUN_CHAMBERS) % GUN_CHAMBERS
-    : 0;
-  document.getElementById('gunChance').textContent = remaining;
-
+  // 右侧：只显示各存活对手的剩余手牌（每次出牌后刷新）
   const oppLines = gameState.players
     .filter(p => p.id !== 0 && p.alive)
-    .map(p => p.name + ': ' + p.hand.length + '张');
-  document.getElementById('opponentCards').textContent = oppLines.length
-    ? oppLines.join(' | ')
-    : '无对手';
+    .map(p => '<div class="opp-row"><span class="opp-name">' + p.name + '</span><span class="opp-count">' + p.hand.length + '张</span></div>');
+  document.getElementById('opponentCards').innerHTML = oppLines.length
+    ? oppLines.join('')
+    : '<div class="opp-empty">无对手</div>';
 }
 
 // ==================== 对话气泡 ====================
