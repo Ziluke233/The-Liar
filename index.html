@@ -116,10 +116,10 @@ body {
   transition: opacity 0.3s;
 }
 .seat.dead { opacity: 0.4; filter: grayscale(1); }
-.seat[data-pos="top"] { grid-area: top; justify-self: center; margin-bottom: 16px; }
+.seat[data-pos="top"] { grid-area: top; justify-self: center; margin-bottom: clamp(20px, 3.5vh, 34px); }
 .seat[data-pos="left"] { grid-area: left; justify-self: center; align-self: center; }
 .seat[data-pos="right"] { grid-area: right; justify-self: center; align-self: center; }
-.seat[data-pos="bottom"] { grid-area: bottom; justify-self: center; margin-top: 16px; }
+.seat[data-pos="bottom"] { grid-area: bottom; justify-self: center; margin-top: clamp(20px, 3.5vh, 34px); }
 
 /* 头像框 */
 .avatar-box {
