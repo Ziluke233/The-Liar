@@ -1273,113 +1273,57 @@ function aiChallengeDecision(challenger, targetPlayer, cards, isLying) {
 }
 
 function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
-  try {
-    if (gameState.gameOver) return;
-    const allValid = cards.every(c => c === gameState.targetCard || c === 'Joker');
+  if (gameState.gameOver) return;
+  const allValid = cards.every(c => c === gameState.targetCard || c === 'Joker');
 
-    // 无论质疑结果如何，都重置质疑状态
-    gameState.lastPlayerIdx = -1;
-    gameState.awaitingChallenge = false;
+  // 无论质疑结果如何，都重置质疑状态
+  gameState.lastPlayerIdx = -1;
+  gameState.awaitingChallenge = false;
 
-    if (!allValid || wasLying) {
-      addLog('✅ 【' + challenger.name + '】质疑成功！' + targetPlayer.name + '在说谎', 'good');
-      targetPlayer.caughtLying = true;
-      gameState.players.forEach(p => {
-        if (!p.isHuman && p.id !== targetPlayer.id) p.trustLevels[targetPlayer.name] = Math.max(0, (p.trustLevels[targetPlayer.name] || 50) - 20);
-      });
-      const dialogue = getDialogue(targetPlayer, 'lieCaught');
-      showBubble(targetPlayer, dialogue);
-      addLog('😅 【' + targetPlayer.name + '】"' + dialogue + '"', 'dia');
-      // 说谎者被惩罚
-      performPenalty(targetPlayer);
-    } else {
-      addLog('❌ 【' + challenger.name + '】质疑失败！' + targetPlayer.name + '说的是真话', 'bad');
-      challenger.trustLevels[targetPlayer.name] = Math.min(100, (challenger.trustLevels[targetPlayer.name] || 50) + 10);
-      // 质疑者被惩罚
-      performPenalty(challenger);
-    }
-  } catch (e) {
-    console.error('resolveChallenge ERROR:', e);
-    addLog('❌ 质疑处理出错: ' + e.message, 'bad');
-    // 出错时尝试恢复流程
-    gameState.lastPlayerIdx = -1;
-    gameState.awaitingChallenge = false;
-    if (!gameState.gameOver) nextTurn();
+  if (!allValid || wasLying) {
+    addLog('✅ 【' + challenger.name + '】质疑成功！' + targetPlayer.name + '在说谎', 'good');
+    targetPlayer.caughtLying = true;
+    gameState.players.forEach(p => {
+      if (!p.isHuman && p.id !== targetPlayer.id) p.trustLevels[targetPlayer.name] = Math.max(0, (p.trustLevels[targetPlayer.name] || 50) - 20);
+    });
+    const dialogue = getDialogue(targetPlayer, 'lieCaught');
+    showBubble(targetPlayer, dialogue);
+    addLog('😅 【' + targetPlayer.name + '】"' + dialogue + '"', 'dia');
+    // 说谎者被惩罚
+    performPenalty(targetPlayer);
+  } else {
+    addLog('❌ 【' + challenger.name + '】质疑失败！' + targetPlayer.name + '说的是真话', 'bad');
+    challenger.trustLevels[targetPlayer.name] = Math.min(100, (challenger.trustLevels[targetPlayer.name] || 50) + 10);
+    // 质疑者被惩罚
+    performPenalty(challenger);
   }
 }
 
 // ==================== 惩罚 ====================
 function performPenalty(player) {
-  try {
-    if (gameState.gameOver) return;
-    hideReactionModal();
-    const chamber = player.currentBullet;
-    const isBullet = chamber === player.bulletPosition;
-    player.currentBullet = (player.currentBullet + 1) % GUN_CHAMBERS;
-    player.bulletsFired++;
+  if (gameState.gameOver) return;
+  hideReactionModal(); // 确保反应弹窗关闭，不遮挡惩罚动画
+  const chamber = player.currentBullet;
+  const isBullet = chamber === player.bulletPosition;
+  player.currentBullet = (player.currentBullet + 1) % GUN_CHAMBERS;
+  player.bulletsFired++;
 
-    // 弹出醒目的惩罚结果提示
-    showPenaltyPopup(player, isBullet);
+  // 弹出醒目的惩罚结果提示
+  showPenaltyPopup(player, isBullet);
 
-    if (isBullet) {
-      addLog('💥 砰！' + player.name + '中弹了！', 'bad');
-      player.hp = 0;
-      player.alive = false;
-      triggerDeathEffects(player);
-    } else {
-      addLog('🔘 咔...' + player.name + '安全', 'sys');
-      const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
-      if (seat) {
-        seat.classList.add('flash-red');
-        setTimeout(() => seat.classList.remove('flash-red'), 400);
-      }
-      triggerParticles(player, 8);
+  if (isBullet) {
+    addLog('💥 砰！' + player.name + '中弹了！', 'bad');
+    // 实弹：直接淘汰
+    player.hp = 0;
+    triggerDeathEffects(player);
+  } else {
+    addLog('🔘 咔...' + player.name + '安全', 'sys');
+    // 空弹：不扣HP，只推进弹舱指针（currentBullet已+1）
+    const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+    if (seat) {
+      seat.classList.add('flash-red');
+      setTimeout(() => seat.classList.remove('flash-red'), 400);
     }
-
-    if (player.hp <= 0) {
-      const dialogue = getDialogue(player, 'death');
-      showBubble(player, dialogue);
-      addLog('💀 【' + player.name + '】淘汰！"' + dialogue + '"', 'bad');
-      renderSeats();
-      const aliveCount = gameState.players.filter(p => p.alive).length;
-      if (aliveCount <= 1) {
-        const winner = gameState.players.find(p => p.alive);
-        endGame(winner);
-        return;
-      }
-      // 死亡后跳过死者，继续当前轮（由活着的下一位出牌）
-      gameState.currentPlayerIdx = player.id;
-      advanceTurn();
-      renderSeats();
-      updateTension(-20);
-      // 延迟一小段时间让用户看到结果，然后开新轮
-      setTimeout(() => {
-        try {
-          if (!gameState.gameOver) startRound();
-        } catch (e) {
-          console.error('startRound after death ERROR:', e);
-          addLog('❌ 开新轮出错: ' + e.message, 'bad');
-          if (!gameState.gameOver) nextTurn();
-        }
-      }, 200);
-      return;
-    }
-
-    // 空弹：被惩罚者继续出牌（推进到下一位）
-    gameState.currentPlayerIdx = player.id;
-    advanceTurn();
-    renderSeats();
-    updateTension(isBullet ? -20 : -5);
-    if (!gameState.gameOver) nextTurn();
-  } catch (e) {
-    console.error('performPenalty ERROR:', e);
-    addLog('❌ 惩罚处理出错: ' + e.message, 'bad');
-    // 出错时强制恢复
-    gameState.lastPlayerIdx = -1;
-    gameState.awaitingChallenge = false;
-    if (!gameState.gameOver) nextTurn();
-  }
-}
     triggerParticles(player, 8);
   }
 
@@ -1854,45 +1798,33 @@ function showBubble(player, text) {
   bubble.textContent = text;
   document.body.appendChild(bubble);
 
-  // 定位：基于座位位置，在头像旁边固定方向显示
+  // 定位：基于头像位置，从头像中心向桌面中心方向偏移一小段距离
   requestAnimationFrame(() => {
     const avatar = seat.querySelector('.avatar-box');
-    const refEl = avatar || seat;
+    const refEl = avatar || seat; // 优先以头像为参考点
     const refRect = refEl.getBoundingClientRect();
-    const bw = 180;
-    const bh = 50;
+    const refCx = refRect.left + refRect.width / 2;
+    const refCy = refRect.top + refRect.height / 2;
+    const bw = 180; // max-width
+    const bh = 40;  // approx height
+
+    // 屏幕中心
     const scrW = window.innerWidth;
     const scrH = window.innerHeight;
-    const pos = seat.dataset.pos;
+    const scrCx = scrW / 2;
+    const scrCy = scrH / 2;
 
-    let tx, ty;
-    const pad = 10; // 与头像的间距
+    // 气泡位置：从头像中心向桌面中心方向偏移一段距离
+    const dx = scrCx - refCx;
+    const dy = scrCy - refCy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const offset = 60; // 距头像中心的偏移量
+    let tx = refCx + (dx / dist) * offset;
+    let ty = refCy + (dy / dist) * offset;
 
-    if (pos === 'top') {
-      // 顶部玩家：气泡在头像正下方
-      tx = refRect.left + refRect.width / 2;
-      ty = refRect.bottom + pad + bh / 2;
-    } else if (pos === 'bottom') {
-      // 底部玩家：气泡在头像正上方
-      tx = refRect.left + refRect.width / 2;
-      ty = refRect.top - pad - bh / 2;
-    } else if (pos === 'left') {
-      // 左侧玩家：气泡在头像正右方
-      tx = refRect.right + pad + bw / 2;
-      ty = refRect.top + refRect.height / 2;
-    } else if (pos === 'right') {
-      // 右侧玩家：气泡在头像正左方
-      tx = refRect.left - pad - bw / 2;
-      ty = refRect.top + refRect.height / 2;
-    } else {
-      // 默认：头像上方
-      tx = refRect.left + refRect.width / 2;
-      ty = refRect.top - pad - bh / 2;
-    }
-
-    // 边界限制（确保不超出屏幕）
-    tx = Math.max(bw / 2 + 5, Math.min(scrW - bw / 2 - 5, tx));
-    ty = Math.max(bh / 2 + 5, Math.min(scrH - bh / 2 - 5, ty));
+    // 边界限制
+    tx = Math.max(bw / 2 + 10, Math.min(scrW - bw / 2 - 10, tx));
+    ty = Math.max(bh / 2 + 10, Math.min(scrH - bh / 2 - 10, ty));
 
     bubble.style.left = tx + 'px';
     bubble.style.top = ty + 'px';
