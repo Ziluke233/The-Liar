@@ -1225,6 +1225,191 @@ body {
   color: rgba(255,255,255,0.6);
 }
 
+/* ========== 胜者界面：华丽结算 ========== */
+.modal.winner-modal {
+  max-width: 520px;
+  padding: 38px 44px;
+  border: none;
+  border-radius: 26px;
+  background: linear-gradient(155deg, rgba(38,24,10,0.98), rgba(14,9,5,0.99));
+  box-shadow:
+    0 0 0 2px rgba(251,191,36,0.35),
+    0 0 60px rgba(251,191,36,0.28),
+    0 16px 70px rgba(0,0,0,0.75);
+  overflow: visible;
+  text-align: center;
+  position: relative;
+}
+.modal.winner-modal.draw {
+  box-shadow:
+    0 0 0 2px rgba(120,113,108,0.45),
+    0 0 50px rgba(239,68,68,0.22),
+    0 16px 70px rgba(0,0,0,0.75);
+}
+.modal.winner-modal::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 28px;
+  background: conic-gradient(from 0deg, #fbbf24, #f59e0b, #fde68a, #f59e0b, #fbbf24);
+  z-index: -2;
+  animation: winnerBorderSpin 3.5s linear infinite;
+  filter: blur(5px);
+  opacity: 0.85;
+}
+.modal.winner-modal.draw::before {
+  background: conic-gradient(from 0deg, #7f1d1d, #450a0a, #991b1b, #450a0a, #7f1d1d);
+  opacity: 0.7;
+}
+@keyframes winnerBorderSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.modal-overlay.show .modal.winner-modal {
+  animation: winnerModalIn 0.85s cubic-bezier(0.2, 0.9, 0.25, 1.35) both;
+}
+@keyframes winnerModalIn {
+  0% { opacity: 0; transform: scale(0.35) translateY(60px); }
+  55% { opacity: 1; transform: scale(1.12) translateY(-10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.winner-crown {
+  font-size: 58px;
+  line-height: 1;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 0 20px rgba(251,191,36,0.8));
+  animation: crownFloat 2.4s ease-in-out infinite;
+}
+.modal.winner-modal.draw .winner-crown {
+  filter: drop-shadow(0 0 16px rgba(239,68,68,0.6));
+  animation: skullShake 2.4s ease-in-out infinite;
+}
+@keyframes crownFloat {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-10px) rotate(6deg); }
+}
+@keyframes skullShake {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+.winner-avatar {
+  width: 96px;
+  height: 96px;
+  margin: 8px auto 12px;
+  border-radius: 50%;
+  border: 3px solid rgba(251,191,36,0.55);
+  background: radial-gradient(circle at 35% 35%, rgba(251,191,36,0.18), transparent 60%), var(--bg-card);
+  box-shadow: 0 0 30px rgba(251,191,36,0.35), inset 0 0 20px rgba(251,191,36,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  animation: avatarPulse 2.2s ease-in-out infinite;
+}
+.modal.winner-modal.draw .winner-avatar {
+  border-color: rgba(239,68,68,0.5);
+  box-shadow: 0 0 28px rgba(239,68,68,0.3), inset 0 0 18px rgba(239,68,68,0.12);
+  animation: skullPulse 2.2s ease-in-out infinite;
+}
+@keyframes avatarPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 26px rgba(251,191,36,0.3); }
+  50% { transform: scale(1.06); box-shadow: 0 0 44px rgba(251,191,36,0.55); }
+}
+@keyframes skullPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 22px rgba(239,68,68,0.25); }
+  50% { transform: scale(1.05); box-shadow: 0 0 38px rgba(239,68,68,0.45); }
+}
+.winner-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+.winner-avatar img:not([src=""]) { display: block; }
+.winner-avatar img:not([src=""]) + .winner-avatar-fallback { display: none; }
+.winner-avatar-fallback {
+  font-size: 46px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(251,191,36,0.5));
+}
+.winner-title {
+  font-family: var(--font-main);
+  font-size: 36px;
+  font-weight: 800;
+  margin: 8px 0 12px;
+  background: linear-gradient(90deg, #fbbf24, #fffbeb, #f59e0b, #fbbf24);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: winnerShimmer 2.4s linear infinite;
+  text-shadow: none;
+}
+.modal.winner-modal.draw .winner-title {
+  background: linear-gradient(90deg, #fca5a5, #fee2e2, #ef4444, #fca5a5);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@keyframes winnerShimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 220% center; }
+}
+.winner-subtitle {
+  font-size: 17px;
+  color: rgba(255,255,255,0.88);
+  margin-bottom: 6px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.winner-actions { margin-top: 28px; }
+.winner-btn {
+  font-size: 17px;
+  padding: 13px 40px;
+  border-radius: 999px;
+  animation: winnerBtnPulse 2s ease-in-out infinite;
+}
+@keyframes winnerBtnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0.5); }
+  50% { box-shadow: 0 0 0 16px rgba(251,191,36,0); }
+}
+.winner-sparkles {
+  position: absolute;
+  inset: -50px;
+  pointer-events: none;
+  z-index: -1;
+}
+.winner-sparkles::before,
+.winner-sparkles::after {
+  content: '✦';
+  position: absolute;
+  color: #fbbf24;
+  font-size: 28px;
+  filter: drop-shadow(0 0 8px rgba(251,191,36,0.7));
+  animation: sparkleTwinkle 1.8s ease-in-out infinite;
+}
+.winner-sparkles::before { top: 12%; left: 6%; animation-delay: 0s; }
+.winner-sparkles::after { bottom: 18%; right: 10%; animation-delay: 0.9s; }
+@keyframes sparkleTwinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.8) rotate(-10deg); }
+  50% { opacity: 1; transform: scale(1.4) rotate(10deg); }
+}
+
+/* 胜者彩纸屑 */
+.confetti {
+  position: fixed;
+  width: 8px;
+  height: 14px;
+  z-index: 999;
+  pointer-events: none;
+  border-radius: 2px;
+  animation: confettiFall 3.8s ease-in forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
 /* ========== 响应式 ========== */
 @media (max-width: 1050px) {
   .top-bar { padding-inline:12px; }
@@ -1422,12 +1607,18 @@ body {
 
 <!-- 游戏结束 -->
 <div class="modal-overlay" id="gameOverModal">
-  <div class="modal" style="text-align:center">
-    <h2 id="gameOverTitle">游戏结束</h2>
-    <p id="gameOverText"></p>
-    <div style="margin-top:16px">
-      <button class="btn btn-gold" onclick="location.reload()">再来一局</button>
+  <div class="modal winner-modal" id="winnerModalBox">
+    <div class="winner-crown" id="winnerCrown">👑</div>
+    <div class="winner-avatar" id="winnerAvatar">
+      <img id="winnerAvatarImg" src="" alt="">
+      <div class="winner-avatar-fallback" id="winnerAvatarFallback">🏆</div>
     </div>
+    <h2 class="winner-title" id="gameOverTitle">游戏结束</h2>
+    <p class="winner-subtitle" id="gameOverText"></p>
+    <div class="winner-actions">
+      <button class="btn btn-gold winner-btn" onclick="location.reload()">再来一局</button>
+    </div>
+    <div class="winner-sparkles" aria-hidden="true"></div>
   </div>
 </div>
 
@@ -2865,17 +3056,50 @@ function addLog(text, type) {
 }
 
 // ==================== 游戏结束 ====================
+function spawnWinnerConfetti() {
+  const colors = ['#fbbf24', '#f59e0b', '#fde68a', '#ffffff', '#ef4444', '#34d399'];
+  const shapes = ['', 'border-radius:50%', 'transform:rotate(45deg)'];
+  for (let i = 0; i < 90; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti';
+    p.style.left = (Math.random() * 100) + 'vw';
+    p.style.top = (-10 - Math.random() * 40) + 'px';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.width = (6 + Math.random() * 8) + 'px';
+    p.style.height = (10 + Math.random() * 14) + 'px';
+    p.style.opacity = 0.8 + Math.random() * 0.2;
+    p.style.animationDelay = (Math.random() * 2.5) + 's';
+    p.style.animationDuration = (3 + Math.random() * 2) + 's';
+    const shape = shapes[Math.floor(Math.random() * shapes.length)];
+    if (shape) p.style.cssText += shape;
+    document.body.appendChild(p);
+    setTimeout(() => { if (p.parentNode) p.remove(); }, 6000);
+  }
+}
+
 function endGame(winner) {
   gameState.gameOver = true;
   const modal = document.getElementById('gameOverModal');
-  if (winner && winner.alive) {
-    document.getElementById('gameOverTitle').textContent = '🎉 ' + winner.name + ' 获胜！';
+  const box = document.getElementById('winnerModalBox');
+  const crown = document.getElementById('winnerCrown');
+  const avatarImg = document.getElementById('winnerAvatarImg');
+  const isWinner = winner && winner.alive;
+
+  box.classList.toggle('draw', !isWinner);
+  crown.textContent = isWinner ? '👑' : '💀';
+
+  if (isWinner) {
+    document.getElementById('gameOverTitle').textContent = winner.name + ' 获胜！';
     const reason = winner.hand.length === 0 ? '率先清空手牌！' : '成为最后的幸存者！';
-    document.getElementById('gameOverText').textContent = '恭喜' + winner.name + reason;
+    document.getElementById('gameOverText').textContent = '恭喜 ' + winner.name + ' ' + reason;
+    avatarImg.src = winner.avatar || '';
+    spawnWinnerConfetti();
   } else {
-    document.getElementById('gameOverTitle').textContent = '💀 全员淘汰';
+    document.getElementById('gameOverTitle').textContent = '全员淘汰';
     document.getElementById('gameOverText').textContent = '所有人都在酒馆倒下了...';
+    avatarImg.src = '';
   }
+
   modal.classList.add('show');
   renderSeats();
   renderActions();
