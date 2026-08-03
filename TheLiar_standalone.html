@@ -1,0 +1,3589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>The Liar - 骗子酒馆</title>
+<style>
+:root {
+  --bg-primary: #0c0a09;
+  --bg-panel: #1c1917;
+  --bg-card: #292524;
+  --border-gold: #a16207;
+  --border-gold-light: #d97706;
+  --accent-gold: #fbbf24;
+  --accent-red: #ef4444;
+  --accent-green: #22c55e;
+  --accent-blue: #3b82f6;
+  --text-primary: #fafaf9;
+  --text-secondary: #a8a29e;
+  --text-dim: #78716c;
+  --font-main: Georgia, 'Times New Roman', serif;
+  --font-ui: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html { width:100%; height:100%; overflow:hidden; background:#090706; }
+
+body {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(151,91,38,.12), transparent 38%),
+    linear-gradient(135deg, rgba(255,211,128,.025) 25%, transparent 25%) 0 0/8px 8px,
+    linear-gradient(315deg, rgba(255,211,128,.02) 25%, transparent 25%) 0 0/8px 8px,
+    #090706;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  height: 100dvh;
+  min-height: 420px;
+  overflow: hidden;
+  overscroll-behavior: none;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== 顶部栏 ========== */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 24px;
+  background: linear-gradient(180deg, #1c1917, #0c0a09);
+  border-bottom: 2px solid var(--border-gold);
+  flex-shrink: 0;
+}
+.game-title {
+  font-family: var(--font-main);
+  font-size: 26px;
+  font-weight: bold;
+  color: var(--accent-gold);
+  letter-spacing: 1px;
+}
+.game-title .sub { font-size: 13px; color: var(--text-secondary); margin-left: 8px; font-family: var(--font-ui); }
+.top-info { display: flex; gap: 16px; align-items: center; font-size: 13px; color: var(--text-secondary); }
+.top-info strong { color: var(--accent-gold); }
+.top-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  color: var(--accent-gold);
+  padding: 4px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+.top-btn:hover { background: var(--border-gold); color: var(--bg-primary); }
+
+/* ========== 主游戏区 ========== */
+.game-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 桌面区 */
+.game-board {
+  flex: 1;
+  display: grid;
+  grid-template-areas:
+    ". top ."
+    "left center right"
+    ". bottom .";
+  grid-template-columns: clamp(104px,10vw,130px) minmax(0,1fr) clamp(104px,10vw,130px);
+  grid-template-rows: auto minmax(0,1fr) auto;
+  gap: clamp(8px,1.5vw,16px);
+  padding: clamp(10px,2vw,24px);
+  background:
+    radial-gradient(ellipse at center, rgba(101,58,25,.3) 0%, rgba(28,20,16,.78) 42%, rgba(9,7,6,.98) 88%),
+    repeating-linear-gradient(90deg, rgba(255,210,140,.025) 0 2px, transparent 2px 10px);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.game-board::before,
+.game-board::after { content:""; position:absolute; inset:0; pointer-events:none; z-index:-1; }
+.game-board::before { background:radial-gradient(ellipse at 50% 52%, transparent 0 28%, rgba(0,0,0,.22) 70%, rgba(0,0,0,.6) 100%), linear-gradient(90deg, rgba(255,206,130,.04), transparent 18% 82%, rgba(255,206,130,.04)); }
+.game-board::after { inset:12px; border:1px solid rgba(201,169,110,.16); border-radius:24px; box-shadow:inset 0 0 70px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.3); }
+/* ========== 玩家座位 ========== */
+.seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  transition: opacity 0.3s;
+}
+.seat.dead { opacity: 0.4; filter: grayscale(1); }
+.seat[data-pos="top"] { grid-area: top; justify-self: center; margin-bottom: clamp(20px, 3.5vh, 34px); }
+.seat[data-pos="left"] { grid-area: left; justify-self: center; align-self: center; }
+.seat[data-pos="right"] { grid-area: right; justify-self: center; align-self: center; }
+.seat[data-pos="bottom"] { grid-area: bottom; justify-self: center; margin-top: clamp(20px, 3.5vh, 34px); }
+
+/* 头像框 */
+.avatar-box {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  border: 3px solid var(--border-gold);
+  background: #1a1520;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  transition: all 0.3s;
+}
+.seat.active .avatar-box {
+  border-color: var(--accent-gold);
+  animation: seatPulse 1.6s ease-in-out infinite;
+}
+@keyframes seatPulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(251,191,36,0.35), 0 4px 12px rgba(0,0,0,0.5); }
+  50% { box-shadow: 0 0 30px rgba(251,191,36,0.8), 0 4px 12px rgba(0,0,0,0.5); }
+}
+
+/* 下一位预备玩家蓝色框 */
+.seat.next-up .avatar-box {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 12px rgba(59,130,246,0.4), 0 4px 12px rgba(0,0,0,0.5);
+}
+.next-up-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.avatar-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+  display: block;
+}
+.avatar-box .fallback {
+  position: absolute;
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--accent-gold);
+  pointer-events: none;
+}
+.avatar-box img:not([src=""]) + .fallback { display: none; }
+.avatar-box .dead-skull {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  color: var(--accent-red);
+}
+
+/* 信息面板 */
+.info-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-gold);
+  border-radius: 10px;
+  padding: 5px 8px;
+  text-align: center;
+  min-width: 100px;
+}
+.info-name { font-size: 14px; font-weight: bold; color: var(--text-primary); }
+.info-role { font-size: 11px; color: var(--text-dim); }
+
+/* HP条 */
+.hp-box {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  margin-top: 2px;
+}
+.hp-seg {
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  background: #3f3a35;
+  border: 1px solid #2a2622;
+  transition: all 0.3s;
+}
+.hp-seg.on { background: var(--accent-green); border-color: var(--accent-green); }
+.hp-seg.on.warn { background: #f59e0b; border-color: #f59e0b; }
+.hp-seg.on.danger { background: var(--accent-red); border-color: var(--accent-red); animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* 弹舱 */
+.gun-box {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  margin-top: 2px;
+}
+.gun-ch {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3f3a35;
+  border: 1px solid #2a2622;
+}
+.gun-ch.bullet { background: var(--accent-red); border-color: var(--accent-red); }
+.gun-ch.current { border-color: var(--accent-gold); box-shadow: 0 0 3px var(--accent-gold); }
+.gun-ch.spent { background: var(--text-dim); opacity: 0.5; }
+
+/* 信任度 */
+.trust-box { display: flex; gap: 1px; justify-content: center; margin-top: 2px; }
+.trust-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-dim); }
+.trust-dot.high { background: var(--accent-green); }
+.trust-dot.med { background: var(--accent-gold); }
+.trust-dot.low { background: var(--accent-red); }
+
+/* 手牌数量显示 */
+.hand-count {
+  font-size: 10px;
+  color: var(--accent-gold);
+  font-weight: bold;
+  text-align: center;
+  margin-top: 2px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  display: inline-block;
+  min-width: 28px;
+}
+.hand-count.empty {
+  color: var(--accent-green);
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.15);
+  animation: handCountPulse 1.5s ease-in-out infinite;
+}
+@keyframes handCountPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* 对话气泡 */
+.bubble {
+  position: fixed;
+  background: var(--bg-panel);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  max-width: 180px;
+  text-align: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  line-height: 1.4;
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.56,0.64,1);
+  transform: translate(-50%, -50%) scale(0.8);
+}
+.bubble.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+/* 思考气泡（呼吸动画） */
+.bubble.thinking {
+  border-color: var(--accent-blue);
+  background: linear-gradient(135deg, rgba(30,41,59,0.95), rgba(15,23,42,0.95));
+  box-shadow: 0 0 20px rgba(59,130,246,0.3), 0 4px 12px rgba(0,0,0,0.6);
+  animation: thinkingPulse 2s ease-in-out infinite;
+  font-style: italic;
+  color: var(--accent-blue);
+}
+@keyframes thinkingPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(59,130,246,0.2), 0 4px 12px rgba(0,0,0,0.6); }
+  50% { box-shadow: 0 0 28px rgba(59,130,246,0.5), 0 4px 12px rgba(0,0,0,0.6); }
+}
+.bubble.thinking .thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.bubble.thinking .thinking-dots .dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+.bubble.thinking .thinking-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+.bubble.thinking .thinking-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotBounce {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0) scale(0.8); }
+  40% { opacity: 1; transform: translateY(-4px) scale(1.35); }
+}
+
+/* 质疑气泡（红色脉冲+振动） */
+.bubble.challenge {
+  border-color: var(--accent-red);
+  background: linear-gradient(135deg, rgba(60,20,20,0.95), rgba(30,10,10,0.95));
+  box-shadow: 0 0 24px rgba(239,68,68,0.4), 0 4px 12px rgba(0,0,0,0.6);
+  animation: challengeShake 0.5s ease-in-out, challengeFlash 0.7s ease-out;
+  color: #ff9999;
+  font-weight: bold;
+}
+@keyframes challengeFlash {
+  0% { box-shadow: 0 0 0 rgba(239,68,68,0), 0 4px 12px rgba(0,0,0,0.6); }
+  30% { box-shadow: 0 0 38px rgba(239,68,68,0.85), 0 4px 12px rgba(0,0,0,0.6); }
+  100% { box-shadow: 0 0 24px rgba(239,68,68,0.4), 0 4px 12px rgba(0,0,0,0.6); }
+}
+@keyframes challengeShake {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  10% { transform: translate(-53%, -50%) scale(1.02); }
+  20% { transform: translate(-47%, -50%) scale(1.02); }
+  30% { transform: translate(-51%, -48%) scale(1.01); }
+  40% { transform: translate(-49%, -52%) scale(1.01); }
+  50% { transform: translate(-52%, -50%) scale(1); }
+  60% { transform: translate(-48%, -50%) scale(1); }
+  70% { transform: translate(-50%, -49%) scale(1); }
+  80% { transform: translate(-50%, -51%) scale(1); }
+  90% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 不质疑气泡（绿色稳重） */
+.bubble.pass {
+  border-color: var(--accent-green);
+  background: linear-gradient(135deg, rgba(20,45,25,0.95), rgba(10,30,15,0.95));
+  box-shadow: 0 0 16px rgba(34,197,94,0.3), 0 4px 12px rgba(0,0,0,0.6);
+  color: #90ee90;
+}
+
+/* 左上角通知区 */
+.notice-area {
+  position: fixed;
+  top: 56px;
+  left: 8px;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 176px;
+  max-width: 176px;
+  pointer-events: none;
+  background: rgba(12, 10, 9, 0.7);
+  border: 1px solid rgba(161, 98, 7, 0.25);
+  border-radius: 10px;
+  padding: 8px;
+  padding-top: 24px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.notice-area::before {
+  content: '⚡ 对决记录';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  font-size: 10px;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(161, 98, 7, 0.2);
+  background: rgba(161, 98, 7, 0.08);
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+.notice-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: bold;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transform: translateX(-16px) scale(0.92);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1.4);
+  margin-top: 2px;
+}
+.notice-item.show {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+.notice-item.hide {
+  opacity: 0;
+  transform: translateX(10px) scale(0.9);
+  transition: all 0.25s ease-in;
+}
+.notice-item.challenge {
+  background: rgba(60, 20, 20, 0.9);
+  border: 1px solid var(--accent-red);
+  color: #ff9999;
+  animation: noticeShake 0.5s ease-in-out;
+}
+.notice-item.pass {
+  background: rgba(20, 45, 25, 0.9);
+  border: 1px solid var(--accent-green);
+  color: #90ee90;
+}
+.notice-icon { font-size: 13px; }
+@keyframes noticeShake {
+  0%, 100% { transform: translateX(0) scale(1); }
+  10% { transform: translateX(-4px) scale(1.01); }
+  20% { transform: translateX(3px) scale(1.01); }
+  30% { transform: translateX(-3px) scale(1); }
+  40% { transform: translateX(2px) scale(1); }
+  50% { transform: translateX(-2px) scale(1); }
+  60% { transform: translateX(1px) scale(1); }
+  70% { transform: translateX(-1px) scale(1); }
+}
+
+/* 出牌区域装饰 */
+.play-zone {
+  min-height: 50px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 7px 12px;
+  background:
+    radial-gradient(ellipse at center, rgba(201,169,110,0.06) 0%, transparent 70%),
+    rgba(0,0,0,0.25);
+  border-radius: 14px;
+  min-width: 200px;
+  border: 1px solid rgba(201,169,110,0.12);
+  position: relative;
+}
+.play-zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, rgba(201,169,110,0.08), transparent 40%, rgba(201,169,110,0.04)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.play-zone::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,169,110,0.2), transparent);
+  pointer-events: none;
+}
+/* 出牌区角落装饰 */
+.play-zone-deco-left, .play-zone-deco-right {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+.play-zone-deco-left {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--accent-gold);
+  border-left: 2px solid var(--accent-gold);
+  border-top-left-radius: 14px;
+}
+.play-zone-deco-right {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--accent-gold);
+  border-right: 2px solid var(--accent-gold);
+  border-bottom-right-radius: 14px;
+}
+/* 出牌区空状态提示 */
+.play-zone-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+}
+.play-zone-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.5;
+  animation: hintFade 3s ease-in-out infinite;
+}
+@keyframes hintFade {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+/* ========== 中央区域 ========== */
+.center-area {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  align-self: center;
+}
+
+/* 目标牌 */
+.target-display {
+  background: var(--bg-panel);
+  border: 2px solid var(--border-gold);
+  border-radius: 12px;
+  padding: 7px 20px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+.target-display .label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+.target-display .value { font-size: 30px; font-weight: bold; color: var(--accent-gold); font-family: var(--font-main); }
+
+/* 紧张度 */
+.tension-wrap { width: 160px; }
+.tension-bar { height: 8px; background: #3f3a35; border-radius: 4px; overflow: hidden; border: 1px solid #2a2622; }
+.tension-fill { height: 100%; background: var(--accent-green); border-radius: 4px; transition: all 0.5s; position: relative; overflow: hidden; }
+.tension-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+  transform: translateX(-100%);
+  animation: tensionShimmer 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes tensionShimmer { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(200%); } }
+.tension-label { text-align: center; font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+/* 出牌区 */
+.played-card {
+  width: 44px;
+  height: 62px;
+  background: linear-gradient(135deg, #f5e6d3, #e8d5c4);
+  border: 2px solid #c9a96e;
+  border-radius: 6px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  font-family: var(--font-main);
+  animation: cardIn 0.4s cubic-bezier(0.2,0.9,0.3,1.3) both;
+}
+.played-card .card-corner {
+  position: absolute;
+  font-size: 8px;
+  font-weight: bold;
+  line-height: 1;
+  text-align: center;
+}
+.played-card .card-corner.top-left { top: 2px; left: 2px; }
+.played-card .card-corner.bottom-right { bottom: 2px; right: 2px; transform: rotate(180deg); }
+.played-card .card-center { font-size: 20px; }
+.played-card.red { color: #c41e3a; }
+.played-card.black { color: #1a1a1a; }
+.played-card.joker {
+  background: linear-gradient(135deg, #2a1f15, #1a1210);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+.played-card.joker .card-center { font-size: 16px; }
+@keyframes cardIn { from { opacity:0; transform:scale(0.5) translateY(-20px); } to { opacity:1; transform:scale(1) translateY(0); } }
+
+/* ========== 扑克牌（手牌区） ========== */
+.playing-card {
+  width: 56px;
+  height: 80px;
+  background: linear-gradient(135deg, #f5e6d3, #e8d5c4);
+  border: 2px solid #c9a96e;
+  border-radius: 8px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+  color: #2a1810;
+  font-family: var(--font-main);
+  user-select: none;
+}
+@keyframes cardEnter {
+  0% { opacity: 0; transform: translateY(26px) scale(0.8) rotate(-6deg); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.04) rotate(2deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+/* 发牌/重开一轮：从左往右 3s 铺开发牌 */
+@keyframes cardDeal {
+  0%   { opacity: 0; transform: translateX(-32px) scale(0.55) rotate(-8deg); }
+  60%  { opacity: 1; transform: translateX(4px) scale(1.05) rotate(2deg); }
+  100% { opacity: 1; transform: translateX(0) scale(1) rotate(0); }
+}
+.playing-card:hover {
+  transform: translateY(-6px) scale(1.06);
+  box-shadow: 0 6px 24px rgba(251,191,36,0.35), 0 0 0 2px rgba(251,191,36,0.15), inset 0 1px 0 rgba(255,255,255,0.3);
+  border-color: #d97706;
+  z-index: 2;
+}
+.playing-card.selected {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 20px rgba(251,191,36,0.6), 0 0 0 3px rgba(251,191,36,0.2), 0 4px 12px rgba(0,0,0,0.4);
+  background: linear-gradient(135deg, #fff3d6, #f5e6d3);
+  transform: translateY(-8px) scale(1.08);
+  animation: cardGlow 1.5s ease-in-out infinite;
+  z-index: 3;
+}
+@keyframes cardGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.5), 0 0 0 3px rgba(251,191,36,0.15); }
+  50% { box-shadow: 0 0 28px rgba(251,191,36,0.8), 0 0 0 3px rgba(251,191,36,0.3); }
+}
+.playing-card .card-corner {
+  position: absolute;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1.1;
+  text-align: center;
+  color: inherit;
+}
+.playing-card .card-corner .suit { font-size: 12px; }
+.playing-card .card-corner.top-left { top: 3px; left: 3px; }
+.playing-card .card-corner.bottom-right { bottom: 3px; right: 3px; transform: rotate(180deg); }
+.playing-card .card-center {
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.playing-card.red { color: #c41e3a; }
+.playing-card.black { color: #1a1a1a; }
+.playing-card.joker {
+  background: linear-gradient(135deg, #2a1f15, #1a1210);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+.playing-card.joker .card-center { font-size: 22px; }
+.playing-card.joker .joker-text {
+  position: absolute;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* 出牌飞行动画 */
+.flying-card {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
+  will-change: transform, left, top, opacity;
+}
+
+/* ========== 侧边日志 ========== */
+.log-panel {
+  width: clamp(200px,22vw,280px);
+  background: var(--bg-panel);
+  border-left: 2px solid var(--border-gold);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.log-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-gold);
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--accent-gold);
+  display: flex;
+  justify-content: space-between;
+}
+.log-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.log-entry { margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(74,60,48,0.2); }
+.log-entry.sys { color: var(--text-secondary); }
+.log-entry.act { color: var(--accent-gold); }
+.log-entry.chal { color: var(--accent-red); font-weight: bold; }
+.log-entry.dia { color: var(--accent-blue); font-style: italic; }
+.log-entry.good { color: var(--accent-green); }
+.log-entry.bad { color: var(--accent-red); font-weight: bold; }
+
+/* ========== 底部操作区（骗子酒馆吧台风格） ========== */
+.bottom-panel {
+  background:
+    /* 扑克花色水印 */
+    url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2780%27%20height=%2780%27%3E%3Ctext%20x=%2712%27%20y=%2726%27%20font-size=%2718%27%20fill=%27%23a16207%27%20opacity=%270.16%27%3E♠%3C/text%3E%3Ctext%20x=%2746%27%20y=%2726%27%20font-size=%2718%27%20fill=%27%23a16207%27%20opacity=%270.12%27%3E♥%3C/text%3E%3Ctext%20x=%2712%27%20y=%2764%27%20font-size=%2718%27%20fill=%27%23a16207%27%20opacity=%270.12%27%3E♦%3C/text%3E%3Ctext%20x=%2746%27%20y=%2764%27%20font-size=%2718%27%20fill=%27%23a16207%27%20opacity=%270.16%27%3E♣%3C/text%3E%3C/svg%3E"),
+    /* 顶部辉光 */
+    radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.10) 0%, transparent 55%),
+    /* 竖向木板缝隙 */
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 70px),
+    /* 横向木纹 */
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 30px),
+    /* 底色 */
+    linear-gradient(180deg, rgba(16,12,10,0.98), rgba(34,26,21,0.98));
+  background-size: 80px 80px, 100% 100%, 70px 70px, 30px 30px, 100% 100%;
+  border-top: 2px solid var(--border-gold);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    inset 0 12px 40px rgba(0,0,0,0.55),
+    0 -8px 28px rgba(0,0,0,0.45);
+}
+/* 顶部黄铜装饰条 */
+.bottom-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, rgba(251,191,36,0.55) 20%, #fbbf24 50%, rgba(251,191,36,0.55) 80%, transparent 100%);
+  box-shadow: 0 2px 12px rgba(251,191,36,0.25);
+  pointer-events: none;
+}
+/* 底部花色装饰带 */
+.bottom-panel::after {
+  content: '♠  ♥  ♦  ♣';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  letter-spacing: 10px;
+  color: rgba(251,191,36,0.12);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+/* 底部手牌区域外围装饰容器 */
+.hand-section {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  background:
+    /* 顶部微光 */
+    radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.14) 0%, transparent 45%),
+    /* 中心淡金辉 */
+    radial-gradient(ellipse at 50% 60%, rgba(251,191,36,0.06) 0%, transparent 55%),
+    /* 绿色毡布纹理（两方向交叉） */
+    repeating-linear-gradient(45deg, rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.22) 1px, transparent 1px, transparent 10px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 14px),
+    /* 边缘暗角 */
+    radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%),
+    /* 底色 */
+    linear-gradient(180deg, rgba(38,31,27,0.96), rgba(18,14,12,0.98));
+  background-size: 100% 100%, 100% 100%, 22px 22px, 24px 24px, 100% 100%, 100% 100%;
+  border: 1px solid rgba(161, 98, 7, 0.38);
+  box-shadow:
+    inset 0 1px 22px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(0,0,0,0.45),
+    0 8px 28px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+/* 手牌区域角落装饰 */
+.hand-section::before, .hand-section::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.hand-section::before {
+  top: -1px;
+  left: -1px;
+  border-top: 1px solid rgba(251,191,36,0.3);
+  border-left: 1px solid rgba(251,191,36,0.3);
+  border-top-left-radius: 10px;
+}
+.hand-section::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 1px solid rgba(251,191,36,0.3);
+  border-right: 1px solid rgba(251,191,36,0.3);
+  border-bottom-right-radius: 10px;
+}
+/* 手牌装饰光晕：一条斜向扫过桌面的微光 */
+.hand-glow {
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(115deg, transparent 25%, rgba(251,191,36,0.10) 45%, rgba(255,255,255,0.06) 50%, rgba(251,191,36,0.10) 55%, transparent 75%);
+  pointer-events: none;
+  animation: handShimmer 5s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+@keyframes handShimmer {
+  0%, 100% { left: -60%; opacity: 0; }
+  15% { opacity: 1; }
+  65% { opacity: 1; }
+  80% { left: 110%; opacity: 0; }
+}
+/* 当前行动提示标签 */
+.action-tag {
+  font-size: 10px;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.7;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.12);
+}
+.hand-label { font-size: 13px; color: var(--text-secondary); }
+.hand-wrap { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; position: relative; }
+
+/* 手牌区两侧信息小框 */
+.side-info {
+  width: 118px;
+  min-width: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.12) 0%, transparent 50%),
+    repeating-linear-gradient(45deg, rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.22) 1px, transparent 1px, transparent 10px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 14px),
+    radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%),
+    linear-gradient(180deg, rgba(38,31,27,0.96), rgba(18,14,12,0.98));
+  background-size: 100% 100%, 22px 22px, 24px 24px, 100% 100%, 100% 100%;
+  border: 1px solid rgba(161, 98, 7, 0.38);
+  box-shadow:
+    inset 0 1px 18px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(0,0,0,0.45),
+    0 6px 20px rgba(0,0,0,0.5);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.side-info::before, .side-info::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+.side-info::before {
+  top: -1px; left: -1px;
+  border-top: 1px solid rgba(251,191,36,0.3);
+  border-left: 1px solid rgba(251,191,36,0.3);
+  border-top-left-radius: 10px;
+}
+.side-info::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 1px solid rgba(251,191,36,0.3);
+  border-right: 1px solid rgba(251,191,36,0.3);
+  border-bottom-right-radius: 10px;
+}
+.side-info.left { border-color: rgba(161, 98, 7, 0.42); }
+.side-info.right { border-color: rgba(127, 29, 29, 0.45); }
+.side-info.right .side-title { color: #fca5a5; }
+.side-info.right .side-value { color: #ff9999; text-shadow: 0 0 10px rgba(239,68,68,0.35); }
+.side-info .side-icon { font-size: 18px; line-height: 1; margin-bottom: 2px; filter: drop-shadow(0 0 5px rgba(251,191,36,0.4)); }
+.side-info .side-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--accent-gold);
+  letter-spacing: 1px;
+}
+.side-info .side-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--accent-gold);
+  font-family: var(--font-main);
+  text-shadow: 0 0 12px rgba(251,191,36,0.25);
+  line-height: 1.1;
+}
+.side-info .side-total { font-size: 13px; opacity: 0.65; margin-left: 2px; }
+.side-info .side-note { font-size: 10px; color: var(--text-dim); }
+.side-info .side-sub {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.3;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  cursor: default;
+}
+.side-info .side-sub::-webkit-scrollbar { display: none; }
+.side-info .opp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-top: 2px;
+}
+.side-info .opp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.28);
+  white-space: nowrap;
+}
+.side-info .opp-row .opp-name {
+  color: rgba(255,255,255,0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 64px;
+}
+.side-info .opp-row .opp-count {
+  color: #ffb4b4;
+  font-weight: 700;
+  margin-left: 6px;
+}
+.side-info .opp-empty {
+  font-size: 10px;
+  color: rgba(255,255,255,0.45);
+}
+.side-info .stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-top: 2px;
+}
+.side-info .stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.28);
+  white-space: nowrap;
+}
+.side-info .stat-label {
+  color: rgba(255,255,255,0.7);
+}
+.side-info .stat-num {
+  color: var(--accent-gold);
+  font-weight: 800;
+  font-size: 15px;
+  margin: 0 2px;
+  text-shadow: 0 0 10px rgba(251,191,36,0.3);
+}
+.side-info .stat-unit {
+  color: rgba(255,255,255,0.5);
+  font-size: 10px;
+}
+
+/* 按钮：悬浮弹出式，脱离文档流，不再挤压上方布局 */
+.actions {
+  position: fixed;
+  left: 50%;
+  bottom: 160px;                 /* 由 JS 按底部面板高度动态修正，确保贴合手牌区上方 */
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(92vw, 640px);
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(30,24,17,0.94), rgba(14,11,9,0.94));
+  border: 1px solid rgba(251,191,36,0.35);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.6), inset 0 0 18px rgba(251,191,36,0.06);
+  backdrop-filter: blur(8px);
+  pointer-events: none;          /* 容器不拦截点击，按钮再恢复，避免遮挡牌桌操作 */
+  animation: actionPop 0.4s cubic-bezier(0.2,0.9,0.3,1.25) both;
+}
+.actions:empty { display: none; }
+.actions > * { pointer-events: auto; }
+.actions .btn { animation: actionBtnIn 0.42s cubic-bezier(0.2,0.9,0.3,1.35) both; }
+.actions .btn:nth-child(2) { animation-delay: 0.06s; }
+.actions .btn:nth-child(3) { animation-delay: 0.12s; }
+@keyframes actionPop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(22px) scale(0.92); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes actionBtnIn {
+  0% { opacity: 0; transform: translateY(16px) scale(0.85); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.btn {
+  padding: 9px 22px;
+  border-radius: 10px;
+  border: 2px solid;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s, background 0.18s, color 0.18s;
+  font-family: var(--font-ui);
+  position: relative;
+  overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -130%;
+  width: 60%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.4), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+.btn:hover { transform: translateY(-3px) scale(1.05); }
+.btn-gold { background: var(--bg-card); border-color: var(--border-gold); color: var(--accent-gold); }
+.btn-gold:hover { background: var(--border-gold); color: var(--bg-primary); box-shadow: 0 8px 22px rgba(251,191,36,0.45); }
+.btn-gold:hover::after { animation: btnSheen 0.7s ease; }
+.btn-red { background: var(--bg-card); border-color: var(--accent-red); color: var(--accent-red); }
+.btn-red:hover { background: var(--accent-red); color: white; box-shadow: 0 8px 22px rgba(239,68,68,0.45); }
+.btn-red:hover::after { animation: btnSheen 0.7s ease; }
+.btn-green { background: var(--bg-card); border-color: var(--accent-green); color: var(--accent-green); }
+.btn-green:hover { background: var(--accent-green); color: var(--bg-primary); box-shadow: 0 8px 22px rgba(34,197,94,0.45); }
+.btn-green:hover::after { animation: btnSheen 0.7s ease; }
+.btn:active { transform: translateY(-1px) scale(0.96); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.forced-notice { display:inline-flex; align-items:center; padding:6px 10px; border:1px solid rgba(239,68,68,.55); border-radius:999px; color:#fecaca; background:rgba(127,29,29,.25); font-size:12px; }
+@keyframes btnSheen { from { left: -130%; } to { left: 140%; } }
+
+/* ========== 弹窗 ========== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-overlay.show { display: flex; }
+.modal-overlay.show .modal { animation: modalIn 0.4s cubic-bezier(0.2,0.9,0.3,1.2) both; }
+@keyframes modalIn {
+  0% { opacity: 0; transform: translateY(18px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modal {
+  background: var(--bg-panel);
+  border: 2px solid var(--border-gold);
+  border-radius: 16px;
+  padding: 24px 32px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  position: relative;
+}
+.modal h2 { font-family: var(--font-main); color: var(--accent-gold); margin-bottom: 16px; font-size: 22px; text-align: center; }
+.modal h3 { color: var(--text-primary); margin-bottom: 12px; font-size: 16px; }
+.modal p { color: var(--text-secondary); font-size: 13px; line-height: 1.6; margin-bottom: 12px; }
+.modal .mode-btns { display: flex; gap: 12px; justify-content: center; margin: 16px 0; }
+.modal .mode-card {
+  flex: 1;
+  background: var(--bg-card);
+  border: 2px solid var(--border-gold);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+.modal .mode-card:hover { border-color: var(--accent-gold); transform: translateY(-2px); }
+.modal .mode-card .icon { font-size: 28px; margin-bottom: 6px; }
+.modal .mode-card .title { font-weight: bold; color: var(--text-primary); font-size: 14px; }
+.modal .mode-card .desc { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+.modal .field { margin-bottom: 12px; }
+.modal .field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.modal .field input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.modal .field input:focus { outline: none; border-color: var(--accent-gold); }
+.modal .field textarea.pc-persona { width: 100%; min-height: 56px; resize: vertical; padding: 8px 10px; background: var(--bg-panel); border: 1px solid var(--border-gold); border-radius: 6px; color: var(--text-primary); font-size: 12px; line-height: 1.5; font-family: var(--font-main); }
+.modal .field textarea.pc-persona:focus { outline: none; border-color: var(--accent-gold); }
+
+/* AI设置：可滚动大弹窗 */
+.config-modal { width: min(580px, 94%); max-height: 88vh; overflow-y: auto; }
+.config-section { border-top: 1px dashed var(--border-gold); padding-top: 14px; margin-top: 14px; }
+.config-section > .sec-title { font-size: 13px; color: var(--accent-gold); margin-bottom: 8px; font-weight: bold; }
+.config-hint { font-size: 11px; color: var(--text-dim); line-height: 1.6; margin-top: 10px; }
+.player-card { background: var(--bg-card); border: 1px solid var(--border-gold); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+.player-card .pc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.player-card .pc-avatar { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-gold); object-fit: cover; }
+.player-card .pc-name-input { flex: 1; padding: 6px 10px; background: var(--bg-panel); border: 1px solid var(--border-gold); border-radius: 6px; color: var(--text-primary); font-size: 13px; }
+.player-card .pc-name-input:focus { outline: none; border-color: var(--accent-gold); }
+.own-api-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); margin: 8px 0 4px; cursor: pointer; }
+.own-api-toggle input { width: 14px; height: 14px; accent-color: var(--accent-gold); }
+.own-api-fields { display: none; margin-top: 6px; }
+.own-api-fields.show { display: block; }
+.modal .close-x { position: absolute; top: 12px; right: 16px; font-size: 24px; color: var(--text-dim); cursor: pointer; background: none; border: none; }
+.modal .close-x:hover { color: var(--accent-gold); }
+
+/* 反应选择 */
+.reaction-grid { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.reaction-btn { padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border-gold); background: var(--bg-card); color: var(--text-primary); cursor: pointer; font-size: 13px; transition: all 0.2s; }
+.reaction-btn:hover { border-color: var(--accent-gold); background: var(--border-gold); color: var(--bg-primary); }
+
+/* ========== 特效 ========== */
+.shake { animation: shake 0.5s ease; }
+@keyframes shake {
+  0%,100%{transform:translate(0,0)}
+  10%{transform:translate(-5px,3px)}
+  20%{transform:translate(5px,-3px)}
+  30%{transform:translate(-4px,-2px)}
+  40%{transform:translate(4px,3px)}
+  50%{transform:translate(-3px,-1px)}
+  60%{transform:translate(3px,2px)}
+  70%{transform:translate(-2px,1px)}
+  80%{transform:translate(1px,-1px)}
+  90%{transform:translate(-1px,0)}
+}
+
+.flash-red { animation: flashRed 0.4s ease; }
+@keyframes flashRed { 0%{box-shadow:inset 0 0 0 rgba(239,68,68,0)} 50%{box-shadow:inset 0 0 80px rgba(239,68,68,0.3)} 100%{box-shadow:inset 0 0 0 rgba(239,68,68,0)} }
+
+.particle { position: fixed; width: 4px; height: 4px; background: var(--accent-red); border-radius: 50%; pointer-events: none; z-index: 900; will-change: transform, opacity; }
+
+/* 冲击波环 */
+.shockwave-ring {
+  position: fixed;
+  border-radius: 50%;
+  border: 3px solid var(--accent-red);
+  pointer-events: none;
+  z-index: 899;
+  transform: translate(-50%, -50%);
+}
+
+/* 死亡特效 */
+.death-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, rgba(192,57,43,0.15) 50%, rgba(192,57,43,0.4) 100%);
+  pointer-events: none;
+  z-index: 800;
+  animation: deathPulse 0.6s ease;
+}
+@keyframes deathPulse {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 子弹时间特效 */
+.bullet-time {
+  animation: bulletTime 0.3s ease;
+}
+@keyframes bulletTime { 0%{filter:brightness(1)} 50%{filter:brightness(1.5) sepia(0.3)} 100%{filter:brightness(1)} }
+
+/* ========== 开枪特效：指向目标的枪 ========== */
+.gun-pos {
+  position: fixed;
+  width: 132px;
+  height: 88px;
+  z-index: 920;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: gunAimIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.4) forwards;
+}
+.gun-pos.recoil {
+  animation: gunAimIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.4) forwards,
+             gunRecoil 0.24s ease-out 0.45s forwards;
+}
+.gun-aimer {
+  width: 100%;
+  height: 100%;
+  transform: rotate(calc(var(--gun-base, 0deg) + var(--gun-rot, 0deg)));
+  transform-origin: center;
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.75));
+}
+.gun-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+.muzzle-flash {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #ffcc00 30%, rgba(255,100,0,0) 70%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 921;
+}
+.muzzle-flash.flash {
+  animation: muzzleFlash 0.22s ease-out forwards;
+}
+@keyframes gunAimIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.55); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes gunRecoil {
+  0% { transform: translate(-50%, -50%) translateY(0); }
+  35% { transform: translate(-50%, -50%) translateY(-12px); }
+  100% { transform: translate(-50%, -50%) translateY(0); }
+}
+@keyframes muzzleFlash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.4); }
+  60% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+}
+
+/* ========== 屏幕中心符号：空枪盾牌 / 中弹骷髅 ========== */
+.center-symbol {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 960;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+  animation: symbolPop 3s ease forwards;
+}
+.center-symbol.shield {
+  background: radial-gradient(circle at 40% 40%, rgba(74,222,128,0.18), transparent 65%);
+  border: 2px solid rgba(74,222,128,0.45);
+  box-shadow: 0 0 40px rgba(34,197,94,0.35), inset 0 0 30px rgba(34,197,94,0.15);
+}
+.center-symbol.skull {
+  background: radial-gradient(circle at 40% 40%, rgba(248,113,113,0.18), transparent 65%);
+  border: 2px solid rgba(239,68,68,0.45);
+  box-shadow: 0 0 50px rgba(239,68,68,0.45), inset 0 0 30px rgba(239,68,68,0.15);
+}
+.center-symbol .symbol-icon {
+  font-size: 96px;
+  line-height: 1;
+  filter: drop-shadow(0 0 18px currentColor);
+}
+.center-symbol.shield .symbol-icon { color: #4ade80; }
+.center-symbol.skull .symbol-icon { color: #ff6666; }
+.center-symbol::after {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255,255,255,0.12);
+  animation: symbolRing 2s linear infinite;
+}
+@keyframes symbolPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0) rotate(-25deg); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.2) rotate(6deg); }
+  20% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+}
+@keyframes symbolRing {
+  0% { transform: scale(1); opacity: 0.25; }
+  50% { opacity: 0.08; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
+/* ========== 惩罚结果弹窗 ========== */
+.penalty-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.2);
+  z-index: 950;
+  pointer-events: none;
+  opacity: 0;
+  text-align: center;
+  padding: 30px 60px;
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+}
+.penalty-popup.show {
+  opacity: 1;
+  animation: penaltyIn 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+.penalty-popup.hide {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+  transition: all 0.4s ease-in;
+}
+@keyframes penaltyIn {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+  65%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+}
+.penalty-popup.bullet {
+  background: rgba(120, 0, 0, 0.85);
+  border: 3px solid var(--accent-red);
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.6), 0 0 80px rgba(239, 68, 68, 0.3);
+}
+.penalty-popup.empty {
+  background: rgba(0, 80, 40, 0.85);
+  border: 3px solid var(--accent-green);
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
+}
+.penalty-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.penalty-title {
+  font-size: 36px;
+  font-weight: bold;
+  font-family: var(--font-main);
+  margin-bottom: 8px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+}
+.penalty-popup.bullet .penalty-title { color: #ff6666; }
+.penalty-popup.empty .penalty-title { color: #66ff99; }
+.penalty-desc {
+  font-size: 18px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.penalty-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+}
+
+/* ========== 胜者界面：华丽结算 ========== */
+.modal.winner-modal {
+  max-width: 520px;
+  padding: 38px 44px;
+  border: none;
+  border-radius: 26px;
+  background: linear-gradient(155deg, rgba(38,24,10,0.98), rgba(14,9,5,0.99));
+  box-shadow:
+    0 0 0 2px rgba(251,191,36,0.35),
+    0 0 60px rgba(251,191,36,0.28),
+    0 16px 70px rgba(0,0,0,0.75);
+  overflow: visible;
+  text-align: center;
+  position: relative;
+}
+.modal.winner-modal.draw {
+  box-shadow:
+    0 0 0 2px rgba(120,113,108,0.45),
+    0 0 50px rgba(239,68,68,0.22),
+    0 16px 70px rgba(0,0,0,0.75);
+}
+.modal.winner-modal::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 28px;
+  background: conic-gradient(from 0deg, #fbbf24, #f59e0b, #fde68a, #f59e0b, #fbbf24);
+  z-index: -2;
+  animation: winnerBorderSpin 3.5s linear infinite;
+  filter: blur(5px);
+  opacity: 0.85;
+}
+.modal.winner-modal.draw::before {
+  background: conic-gradient(from 0deg, #7f1d1d, #450a0a, #991b1b, #450a0a, #7f1d1d);
+  opacity: 0.7;
+}
+@keyframes winnerBorderSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.modal-overlay.show .modal.winner-modal {
+  animation: winnerModalIn 0.85s cubic-bezier(0.2, 0.9, 0.25, 1.35) both;
+}
+@keyframes winnerModalIn {
+  0% { opacity: 0; transform: scale(0.35) translateY(60px); }
+  55% { opacity: 1; transform: scale(1.12) translateY(-10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.winner-crown {
+  font-size: 58px;
+  line-height: 1;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 0 20px rgba(251,191,36,0.8));
+  animation: crownFloat 2.4s ease-in-out infinite;
+}
+.modal.winner-modal.draw .winner-crown {
+  filter: drop-shadow(0 0 16px rgba(239,68,68,0.6));
+  animation: skullShake 2.4s ease-in-out infinite;
+}
+@keyframes crownFloat {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-10px) rotate(6deg); }
+}
+@keyframes skullShake {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+.winner-avatar {
+  width: 96px;
+  height: 96px;
+  margin: 8px auto 12px;
+  border-radius: 50%;
+  border: 3px solid rgba(251,191,36,0.55);
+  background: radial-gradient(circle at 35% 35%, rgba(251,191,36,0.18), transparent 60%), var(--bg-card);
+  box-shadow: 0 0 30px rgba(251,191,36,0.35), inset 0 0 20px rgba(251,191,36,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  animation: avatarPulse 2.2s ease-in-out infinite;
+}
+.modal.winner-modal.draw .winner-avatar {
+  border-color: rgba(239,68,68,0.5);
+  box-shadow: 0 0 28px rgba(239,68,68,0.3), inset 0 0 18px rgba(239,68,68,0.12);
+  animation: skullPulse 2.2s ease-in-out infinite;
+}
+@keyframes avatarPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 26px rgba(251,191,36,0.3); }
+  50% { transform: scale(1.06); box-shadow: 0 0 44px rgba(251,191,36,0.55); }
+}
+@keyframes skullPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 22px rgba(239,68,68,0.25); }
+  50% { transform: scale(1.05); box-shadow: 0 0 38px rgba(239,68,68,0.45); }
+}
+.winner-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+.winner-avatar img:not([src=""]) { display: block; }
+.winner-avatar img:not([src=""]) + .winner-avatar-fallback { display: none; }
+.winner-avatar-fallback {
+  font-size: 46px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(251,191,36,0.5));
+}
+.winner-title {
+  font-family: var(--font-main);
+  font-size: 36px;
+  font-weight: 800;
+  margin: 8px 0 12px;
+  background: linear-gradient(90deg, #fbbf24, #fffbeb, #f59e0b, #fbbf24);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: winnerShimmer 2.4s linear infinite;
+  text-shadow: none;
+}
+.modal.winner-modal.draw .winner-title {
+  background: linear-gradient(90deg, #fca5a5, #fee2e2, #ef4444, #fca5a5);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@keyframes winnerShimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 220% center; }
+}
+.winner-subtitle {
+  font-size: 17px;
+  color: rgba(255,255,255,0.88);
+  margin-bottom: 6px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.winner-actions { margin-top: 28px; }
+.winner-btn {
+  font-size: 17px;
+  padding: 13px 40px;
+  border-radius: 999px;
+  animation: winnerBtnPulse 2s ease-in-out infinite;
+}
+@keyframes winnerBtnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0.5); }
+  50% { box-shadow: 0 0 0 16px rgba(251,191,36,0); }
+}
+.winner-sparkles {
+  position: absolute;
+  inset: -50px;
+  pointer-events: none;
+  z-index: -1;
+}
+.winner-sparkles::before,
+.winner-sparkles::after {
+  content: '✦';
+  position: absolute;
+  color: #fbbf24;
+  font-size: 28px;
+  filter: drop-shadow(0 0 8px rgba(251,191,36,0.7));
+  animation: sparkleTwinkle 1.8s ease-in-out infinite;
+}
+.winner-sparkles::before { top: 12%; left: 6%; animation-delay: 0s; }
+.winner-sparkles::after { bottom: 18%; right: 10%; animation-delay: 0.9s; }
+@keyframes sparkleTwinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.8) rotate(-10deg); }
+  50% { opacity: 1; transform: scale(1.4) rotate(10deg); }
+}
+
+/* 胜者彩纸屑 */
+.confetti {
+  position: fixed;
+  width: 8px;
+  height: 14px;
+  z-index: 999;
+  pointer-events: none;
+  border-radius: 2px;
+  animation: confettiFall 3.8s ease-in forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 1050px) {
+  .top-bar { padding-inline:12px; }
+  .top-info { gap:8px; }
+  .log-panel { width:clamp(180px,24vw,220px); }
+  .game-board { grid-template-columns:clamp(100px,10vw,120px) minmax(0,1fr) clamp(100px,10vw,120px); }
+  .avatar-box { width:64px; height:64px; }
+  .info-panel { min-width:84px; padding-inline:6px; }
+  .playing-card { width:50px; height:72px; }
+  .hand-wrap { gap: 6px; }
+  .hand-section { padding: 6px 12px; }
+  .side-info { width: 104px; min-width: 104px; padding: 8px 10px; }
+  .side-info .side-value { font-size: 22px; }
+}
+@media (max-height:720px) {
+  .top-bar { padding-block:5px; }
+  .game-title { font-size:21px; }
+  .game-board { padding-block:6px; }
+  .avatar-box { width:56px; height:56px; }
+  .info-panel { padding-block:3px; }
+  .bottom-panel { padding-block:5px; }
+  .playing-card { width:46px; height:66px; }
+}
+@media (max-width:720px) {
+  .game-main { flex-direction:column; }
+  .game-board { min-height:0; grid-template-columns:86px minmax(0,1fr) 86px; gap:4px; padding:6px; }
+  .log-panel { width:100%; height:112px; border-left:0; border-top:2px solid var(--border-gold); }
+  .log-body { padding:6px 10px; }
+  .top-info span:nth-child(n+3) { display:none; }
+  .game-title .sub { display:none; }
+  .avatar-box { width:48px; height:48px; }
+  .info-panel { min-width: auto; padding: 3px 4px; }
+  .playing-card { width:42px; height:60px; }
+  .hand-section { max-width: 100%; padding: 4px 8px; }
+  .bottom-panel { padding-inline: 6px; gap: 6px; }
+  .side-info { width: 76px; min-width: 76px; padding: 6px 4px; border-radius: 10px; }
+  .side-info .side-icon { font-size: 14px; }
+  .side-info .side-value { font-size: 18px; }
+  .side-info .side-title { font-size: 10px; letter-spacing: 0; }
+  .side-info .side-note, .side-info .side-sub { font-size: 9px; }
+  .side-info .side-sub { white-space: nowrap; line-height: 1.25; overflow-x: auto; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- 左上角通知区 -->
+<div class="notice-area" id="noticeArea"></div>
+
+<!-- 顶部栏 -->
+<div class="top-bar">
+  <div class="game-title">The Liar<span class="sub">骗子酒馆</span></div>
+  <div class="top-info">
+    <span>回合 <strong id="roundDisplay">0</strong></span>
+    <span>存活 <strong id="aliveDisplay">4</strong></span>
+    <span id="targetDisplay" style="display:none">目标 <strong id="targetValue">-</strong></span>
+    <span id="deckCount" style="display:none">牌堆 <strong id="deckValue">0</strong></span>
+    <span id="lastPlayCount" style="display:none">上家出 <strong id="lastPlayValue">0</strong>张</span>
+    <button class="top-btn" onclick="showRules()">规则</button>
+    <button class="top-btn" onclick="showConfig()">AI设置</button>
+  </div>
+</div>
+
+<!-- 主游戏区 -->
+<div class="game-main" id="gameMain">
+  <div class="game-board" id="gameBoard">
+    <!-- 座位由JS渲染 -->
+    <div class="center-area" id="centerArea">
+      <div class="target-display" id="targetCardDisplay" style="display:none">
+        <div class="label">目标牌</div>
+        <div class="value" id="targetCardValue">-</div>
+      </div>
+      <div class="tension-wrap" id="tensionWrap" style="display:none">
+        <div class="tension-bar"><div class="tension-fill" id="tensionFill" style="width:0%"></div></div>
+        <div class="tension-label">紧张度</div>
+      </div>
+      <div class="play-zone" id="playZone">
+        <div class="play-zone-deco-left"></div>
+        <div class="play-zone-deco-right"></div>
+        <div class="play-zone-empty" id="playZoneEmpty">
+          <span class="play-zone-hint">等待出牌</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日志面板 -->
+  <div class="log-panel">
+    <div class="log-header">游戏日志 <span style="font-size:11px;color:var(--text-dim)" id="logCount">0条</span></div>
+    <div class="log-body" id="logBody">
+      <div class="log-entry sys">欢迎来到 The Liar！点击"开始游戏"进入酒馆。</div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部操作区 -->
+<div class="bottom-panel" id="bottomPanel">
+  <div class="side-info left" id="targetInfo">
+    <div class="side-icon">⚔️</div>
+    <div class="side-title">揭穿统计</div>
+    <div class="stat-list">
+      <div class="stat-row"><span class="stat-label">质疑</span><span class="stat-num" id="statChallenge">0</span><span class="stat-unit">次</span></div>
+      <div class="stat-row"><span class="stat-label">揭穿</span><span class="stat-num" id="statExpose">0</span><span class="stat-unit">次</span></div>
+    </div>
+    <div class="side-sub">本局累计</div>
+  </div>
+
+  <div class="hand-section">
+    <div class="hand-glow"></div>
+    <div class="action-tag" id="actionTag">等待行动</div>
+    <div class="hand-label" id="handLabel">等待游戏开始...</div>
+    <div class="hand-wrap" id="handWrap"></div>
+    <div class="actions" id="actionArea">
+      <button class="btn btn-gold" id="startBtn" onclick="showModeModal()">开始游戏</button>
+    </div>
+  </div>
+
+  <div class="side-info right" id="gunInfo">
+    <div class="side-icon">👥</div>
+    <div class="side-title">对手手牌</div>
+    <div class="opp-list" id="opponentCards">对手牌数</div>
+  </div>
+</div>
+
+<!-- ========== 弹窗 ========== -->
+
+<!-- 模式选择 -->
+<div class="modal-overlay" id="modeModal">
+  <div class="modal">
+    <button class="close-x" onclick="hideModeModal()">&times;</button>
+    <h2>选择游戏模式</h2>
+    <p>选择一种AI模式开始你的对局：</p>
+    <div class="mode-btns">
+      <div class="mode-card" onclick="startGame('builtin')">
+        <div class="icon">🎲</div>
+        <div class="title">内置AI</div>
+        <div class="desc">3种性格AI，纯本地运行</div>
+      </div>
+      <div class="mode-card" onclick="startGame('ai')">
+        <div class="icon">🤖</div>
+        <div class="title">AI模型</div>
+        <div class="desc">接入LLM，智能对话</div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:11px;margin-top:8px">可随时通过右上角"AI设置"切换模型</p>
+  </div>
+</div>
+
+<!-- 游戏规则 -->
+<div class="modal-overlay" id="rulesModal">
+  <div class="modal" style="max-width:520px">
+    <button class="close-x" onclick="hideRulesModal()">&times;</button>
+    <h2>游戏规则</h2>
+    <div style="max-height:400px;overflow-y:auto;padding-right:8px">
+      <h3>牌组</h3>
+      <p>每轮 20 张牌：6 张 Q、6 张 K、6 张 A、2 张 Joker（万能牌）</p>
+      <h3>回合流程</h3>
+      <ol style="margin-left:16px;color:var(--text-secondary);font-size:12px;line-height:1.8">
+        <li>从 Q、K、A 中随机选出一张作为<strong>目标牌</strong></li>
+        <li>每位玩家发 5 张手牌</li>
+        <li>玩家轮流出牌，声称打出的是目标牌（可出 1-3 张）</li>
+        <li>出牌时牌面<strong>背面朝上</strong>，其他玩家不知道真伪</li>
+        <li>下一个仍有手牌的玩家可以选择<strong>质疑</strong>或<strong>不质疑</strong></li>
+        <li>清空手牌的玩家本轮跳过；若只剩一人持牌，该玩家必须质疑上家</li>
+      </ol>
+      <h3>质疑规则</h3>
+      <ol style="margin-left:16px;color:var(--text-secondary);font-size:12px;line-height:1.8">
+        <li>质疑成功（上家确实撒谎）：上家接受<strong>俄罗斯轮盘</strong>惩罚</li>
+        <li>质疑失败（上家说的是真话）：质疑者自己接受惩罚</li>
+        <li>Joker 可以当作任意牌使用，不算撒谎</li>
+      </ol>
+      <h3>俄罗斯轮盘</h3>
+      <p>左轮手枪 6 个弹舱，随机 1 发实弹。每次扣动扳机：</p>
+      <ul style="margin-left:16px;color:var(--text-secondary);font-size:12px;line-height:1.8">
+        <li>实弹（砰！）：直接淘汰，该玩家出局</li>
+        <li>空弹（咔...）：安全，但本轮结束并重新发牌</li>
+      </ul>
+      <h3>胜利条件</h3>
+      <p>只有成为<strong>最后一名存活玩家</strong>才能赢得整局。清空手牌只会在本轮跳过出牌，不会立即获胜。</p>
+      <h3>操作说明</h3>
+      <ul style="margin-left:16px;color:var(--text-secondary);font-size:12px;line-height:1.8">
+        <li><strong>点击手牌</strong>：选中/取消选中（最多 3 张）</li>
+        <li><strong>出牌</strong>：将选中的牌打出</li>
+        <li><strong>质疑</strong>：怀疑上家在撒谎，翻开验证</li>
+        <li><strong>不质疑</strong>：相信上家，轮到你出牌</li>
+        <li><strong>反应选择</strong>：出牌后选择表情影响 AI 信任度</li>
+      </ul>
+    </div>
+    <div style="margin-top:12px;text-align:center">
+      <button class="btn btn-gold" onclick="hideRulesModal()">知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI配置 -->
+<div class="modal-overlay" id="configModal">
+  <div class="modal config-modal">
+    <button class="close-x" onclick="hideConfigModal()">&times;</button>
+    <h2>AI 设置</h2>
+    <div class="config-section">
+      <div class="sec-title">🌐 总 API（默认，未单独设置者均调用此）</div>
+      <div class="field"><label>API 地址 (OpenAI 兼容)</label><input type="text" id="cfgApiUrl" placeholder="https://api.openai.com/v1/chat/completions"></div>
+      <div class="field"><label>模型名称</label><input type="text" id="cfgModel" placeholder="gpt-4"></div>
+      <div class="field"><label>API Key</label><input type="password" id="cfgApiKey" placeholder="sk-..."></div>
+    </div>
+    <div class="config-section">
+      <div class="sec-title">🤖 人机玩家（名字 / 性格人设 / 独立 API）</div>
+      <div id="playerConfigList"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-gold" onclick="saveConfig()">保存</button>
+      <button class="btn btn-red" onclick="testConnection()">测试连接</button>
+      <button class="btn" style="border-color:var(--text-dim);color:var(--text-dim)" onclick="hideConfigModal()">关闭</button>
+    </div>
+    <p class="config-hint">提示：所有配置仅保存在你的浏览器本地（localStorage），不会上传到任何服务器。若你的 API 端点不支持跨域(CORS)，需在 API 侧开启 CORS 或用本地代理转发。</p>
+  </div>
+</div>
+
+<!-- 反应选择 -->
+<div class="modal-overlay" id="reactionModal">
+  <div class="modal">
+    <h3>选择你的反应</h3>
+    <p>你的反应会影响AI对你的信任度</p>
+    <div class="reaction-grid" id="reactionGrid"></div>
+  </div>
+</div>
+
+<!-- 游戏结束 -->
+<div class="modal-overlay" id="gameOverModal">
+  <div class="modal winner-modal" id="winnerModalBox">
+    <div class="winner-crown" id="winnerCrown">👑</div>
+    <div class="winner-avatar" id="winnerAvatar">
+      <img id="winnerAvatarImg" src="" alt="">
+      <div class="winner-avatar-fallback" id="winnerAvatarFallback">🏆</div>
+    </div>
+    <h2 class="winner-title" id="gameOverTitle">游戏结束</h2>
+    <p class="winner-subtitle" id="gameOverText"></p>
+    <div class="winner-actions">
+      <button class="btn btn-gold winner-btn" onclick="location.reload()">再来一局</button>
+    </div>
+    <div class="winner-sparkles" aria-hidden="true"></div>
+  </div>
+</div>
+
+<script>
+// 锁定游戏视口，避免 Ctrl + 滚轮/快捷键改变浏览器缩放比例。
+window.addEventListener('wheel', event => {
+  if (event.ctrlKey) event.preventDefault();
+}, { passive: false });
+window.addEventListener('keydown', event => {
+  if (event.ctrlKey && ['+', '-', '=', '0'].includes(event.key)) event.preventDefault();
+});
+// ==================== 常量 ====================
+const MAX_HP = 6;
+const GUN_CHAMBERS = 6;
+const MAX_PLAYERS = 4;
+const CARDS_PER_HAND = 5;
+const PERSONALITIES = ['aggressive', 'analytical', 'timid'];
+const DIALOGUE_POOL = {
+  aggressive: {
+    play: ['就这？太简单了', '你们等着瞧', '这把稳了', '跟不跟？', '不信就质疑', '我从来不慌', '梭哈！'],
+    challenge: ['骗人！', '我不信', '你在说谎', '露出马脚了吧', '太假了', '质疑！', '别想骗我'],
+    pass: ['算了放过你', '下次就没这么幸运', '算你走运', '暂时相信你', '我再看看'],
+    lieCaught: ['运气不好', '下次还敢', '哼...', '算你狠'],
+    survive: ['命大', '哈哈哈死不了', '再来啊', '走运而已'],
+    death: ['不！！', '这不可能...', '下次报仇...', '不甘心...']
+  },
+  analytical: {
+    play: ['根据概率...', '这是最优解', '出牌', '分析完毕', '逻辑上可行', '这样做最合理'],
+    challenge: ['概率不对', '这不合逻辑', '数据不支持', '有漏洞', '统计上说你在说谎'],
+    pass: ['暂不质疑', '证据不足', '继续观察', '等待时机'],
+    lieCaught: ['计算失误', '概率没算对', '下次改进'],
+    survive: ['概率眷顾', '幸免于难', '继续分析'],
+    death: ['概率...终究...', '不应该是这样...']
+  },
+  timid: {
+    play: ['我...我出牌', '希望是对的', '别质疑我', '就这样吧', '我不敢撒谎...', '好吧我出'],
+    challenge: ['你...你说谎？', '我...我不确定', '可能...可能有问题', '我...我质疑', '别骗我好吗'],
+    pass: ['我不敢', '算了吧', '我害怕', '相信你一次'],
+    lieCaught: ['对不起...', '我不是故意的', '下次不敢了'],
+    survive: ['太好了...', '吓死我了', '还活着...'],
+    death: ['啊...', '不要...', '救命...']
+  }
+};
+
+// ==================== 状态 ====================
+let gameState = {
+  players: [],
+  deck: [],
+  targetCard: null,
+  currentPlayerIdx: 0,
+  lastPlayerIdx: -1,
+  lastPlayedCards: [],
+  challengeCount: 0,
+  lieExposedCount: 0,
+  roundCount: 0,
+  gameStarted: false,
+  gameOver: false,
+  awaitingChallenge: false,
+  forcedChallenge: false,
+  humanPlayedThisTurn: false,
+  selectedCards: [],
+  tension: 0,
+  gameMode: 'builtin',
+  config: { apiUrl: '', model: 'gpt-4', apiKey: '' }
+};
+
+const PERSONA_DEFAULTS = {
+  aggressive: '你性格激进好斗、爱拱火挑衅，说话冲、带痞气，喜欢虚张声势、激别人来质疑你。',
+  analytical: '你性格冷静理性，爱用概率和逻辑推理，说话有条理，会分析别人出牌是否合理。',
+  timid: '你性格胆小谨慎、容易紧张，说话支支吾吾、不自信，不太敢质疑别人，怕被针对。'
+};
+
+const PLAYER_CONFIGS = [
+  { id: 0, name: '你', avatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5MTYuNzc0OTkiIGhlaWdodD0iNjEyLjA1NTA3IiB2aWV3Qm94PSIwIDAgOTE2Ljc3NDk5IDYxMi4wNTUwNyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHJvbGU9ImltZyIgYXJ0aXN0PSJLYXRlcmluYSBMaW1waXRzb3VuaSIgc291cmNlPSJodHRwczovL3VuZHJhdy5jby8iPjxwb2x5Z29uIHBvaW50cz0iODkzLjM2MyA1OTEuMiA4ODQuMzA5IDU5NS4wNTcgODY1LjExOCA1NjEuOTcyIDg3OC40ODEgNTU2LjI3OCA4OTMuMzYzIDU5MS4yIiBmaWxsPSIjZmZiNmI2Ii8+PHBvbHlnb24gcG9pbnRzPSI4MTguNTQ1IDU5OS43NjcgODA4LjcwNCA1OTkuNzY2IDgwNC4wMjIgNTYxLjgwNiA4MTguNTQ3IDU2MS44MDYgODE4LjU0NSA1OTkuNzY3IiBmaWxsPSIjZmZiNmI2Ii8+PHBhdGggZD0iTTk2MC41MDQsNzU0LjAwNjEsOTMwLjI0LDc1NC4wMDV2LS4zODI3M2ExMS43ODAyMywxMS43ODAyMywwLDAsMSwxMS43Nzk1Ny0xMS43NzkzOWguMDAwNzNsNS41MjgwOS00LjE5MzksMTAuMzE0MjEsNC4xOTQ1NCwyLjY0MTg0LjAwMDA5WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjMmYyZTQxIi8+PHBhdGggZD0iTTEwNDAuNDgwOCw3NDEuNzQ0bC0yNy44NDEyOSwxMS44NjQ1OS0uMTUwMDYtLjM1MjFhMTEuNzgwMiwxMS43ODAyLDAsMCwxLDYuMjE4MDYtMTUuNDU0NjlsLjAwMDY3LS4wMDAyOSwzLjQ0MTE4LTYuMDI1NTIsMTEuMTMzLS4xODUyMSwyLjQzMDM2LTEuMDM1NzFaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiMyZjJlNDEiLz48cGF0aCBkPSJNOTUwLjUwMzYsNTE5LjA3NTQ0bC0xNC45NTcwNyw5MS4wNzUyNSw0LjA3MDU0LDEzLjU3MTc5LTUuMzQxMzgsOS42MTIsNy44NDM5Myw4NC40MTQ1NS0zLjE4NCw3LjAwOTkyLDguODk2MTQsNS40ODY1aDE4LjEwMjM3bC45NjA3MS03Ni40MjExNiw0LjQ3MTYxLTExLjIyMDI4VjYzNi40MjAzbDkuMTAyODctNDYuNTk5ODQsMS42NzYsNTMuMzA0NDEsMi42NDc4NywxMS4yMzc4NS0yLjIyNDE4LDguMDAxNDEsMi45MDYxOSw1LjYwNTY4LDI0LjkwNiw1My40Nzk1OWgyMC4yOTg2N2wtMS41Njk5NC0xMi4wOTQyNWgwYzMuNjM2ODEtMS44NDEzLTUuNDYwMjUtNy4yMjI4NC02LjMzNDQtMTEuMjA0NGwyLjk4ODkxLTYuNzI1MDUtMi45ODg5MS0xMi43MDI4OS0yLjc0MDU2LTI0LjgyMTc1LDIuODkwMTctNTIuMzk0NTgtMS4zNTk5NC03MC41NTU3OGMtNi44MTUzLTkuMTM3MzktMTQuMzc1ODUtMTYuMTg0NDgtMjMuNzQ1NzItMTguMTU4WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjMmYyZTQxIi8+PGNpcmNsZSBpZD0iZTNmNjgzODEtNDU1MS00ZGRlLWE5NTEtYzY1NGM1NTY2N2FlIiBkYXRhLW5hbWU9ImFiNjE3MWZhLTdkNjktNDczNC1iODFjLThkZmY2MGY5NzYxYiIgY3g9Ijg0NS4zMTU2MiIgY3k9IjIzNC42NDkxNCIgcj0iMjAuNTEzMzQiIGZpbGw9IiNmZmI2YjYiLz48cGF0aCBkPSJNOTAyLjM1Miw1NDAuNTkzNzhhOC4wNzIzMyw4LjA3MjMzLDAsMCwxLDcuNTQzMzgtOS44MTM4OGw4LjI2MzIyLTI3LjQ3MDU4LDkuNTUzMjYsMTEuNDQzNTItOS4zMTE1NSwyNC4zMzIxYTguMTE2MTIsOC4xMTYxMiwwLDAsMS0xNi4wNDgzMSwxLjUwODg0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZmZiNmI2Ii8+PHBhdGggaWQ9ImViOWI1N2VlLTg2YWItNDEwZC1iMDNmLWY5ZjVhZTFjMzMzMC01MyIgZGF0YS1uYW1lPSJmMzQ4ZjgxZi1iOTYxLTRhZTQtYmM2Yi03NThmNmFjZmIxMmEiIGQ9Ik05NTUuOTU2MTcsNDI3LjY4MDM2bC0zLjcwMzI2LTYuNzY2MDgtNC43NzIzOCwxLjU5MzA1cy01LjI2ODE2LDMuMzk5NDUtMTIuNjQ0NTUsMTYuMjMyN2MtMy40MTE2OSw1LjkzNTU4LTEwLjc4Njc3LDQzLjk5NzItMTAuNzg2NzcsNDMuOTk3Mkw5MDYuODEwMjgsNTI4LjM4NGwxNy41NzQ3NiwyLjk3MTIyLDE0LjY2NDE3LTM3LjYxOCwxNy0zNloiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzZjNjNmZiIvPjxwYXRoIGQ9Ik05ODYuMTY3ODYsNTE4Ljc4OGMxNC40NDMzNiwwLDI5LjAxNjEyLDIuODQzNzUsMzQuOTgzODksMTMuMDA5NzYtLjE1NTc2LTIuMjEwNDUtLjU0Njg3LTYuMDQzNDUtLjk1MzEyLTkuNTYwMDZsLTEuNDkzMTctOS40NDg3MywxLjUxMjctOC42NjM1NywyLTItMy41ODE1NS0zLjU4MTU0LDIuNDQzMzYtMTguMDg0NDgsOC4wNjQ5NS00Mi42MDI1NEExNS40NzEsMTUuNDcxLDAsMCwwLDEwMjAuNjIsNDIxLjAzNDFsLTcuNzQ4NTMtMy43MjYwNy0xMi41NjEtMTEuNjUwODgtMjIuNzIxNjgtLjE2OTkyLTcuNDEyNTksOS42MzcyLTE5LjUxMzY4LDYuNjI3OTMsMy4yNzUzOSw2Ny43NjA3NC0yLjE0Nyw1LjAwOTc3Yy40ODE0NS40NDE4OSwxLjQ5NjU4LDEuMzg2MjMsMi4wNDYzOSwxLjk5NDYzLjc3NzgzLjg2MDM1LS4yMTI4OSw1LjI5MDUzLS44NzI1Niw3Ljg1NDQ5bC0uOTA3MjMsNi44MzA1NywyLjg1NSwyLjAzOTU1LTMuNzExNDIsNC4zODQyOC0uNzQxNyw1LjU2NDk0Qzk1NC4xNDQ0Myw1MjIuMzE5NzQsOTcwLjA3NjA3LDUxOC43ODgsOTg2LjE2Nzg2LDUxOC43ODhaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiM2YzYzZmYiLz48cGF0aCBkPSJNOTkyLjE3NTg1LDM5OC4xMzA1cS4xMzE0NC0uMjg5NDIuMjYyMTctLjU4MDg1Yy0uMDMzNTkuMDAxMDgtLjA2NjgzLjAwNTkxLS4xMDA0Mi4wMDY3OVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzJmMmU0MSIvPjxwYXRoIGQ9Ik0xMDA4LjAxMTkzLDM1OS4wNDExYTUuNzA5NTUsNS43MDk1NSwwLDAsMC0zLjU3NjYxLTEuNTQ2MzdjLTEuMzI2NDYuMDQyNzUtMi42NzE2MSwxLjI0MDgtMi4zOTY3OSwyLjUzOTIyQTIxLjA4LDIxLjA4LDAsMCwwLDk3Ni42NywzNTAuNTIxNDNjLTMuMjk2ODYsMS4xNjMxNS02LjUyOTk0LDMuNDkwMTUtNy4yODcyNyw2LjkwMzE1YTYuMjE3MTUsNi4yMTcxNSwwLDAsMS0uNzgzMTksMi41NDgyNCwyLjkwOSwyLjkwOSwwLDAsMS0zLjA5Ni43ODQzNmwtLjAzMjU0LS4wMDk1OWEuOTY5MjIuOTY5MjIsMCwwLDAtMS4xNzExMiwxLjM2ODJsLjkzMjgzLDEuNzM5NzRhNy40NzUzNSw3LjQ3NTM1LDAsMCwxLTMuNTYxNDUtLjA3NTc0Ljk2ODQuOTY4NCwwLDAsMC0xLjAyODM0LDEuNTA3LDE2Ljg3OTQsMTYuODc5NCwwLDAsMCwxMy40NTg4OSw2LjkxODA2YzMuNzI3MTctLjAyMjczLDcuNDkyNzMtMS4zMDcyOCwxMS4xMjAxMS0uNDUwMTdhOS42NTkzNSw5LjY1OTM1LDAsMCwxLDYuNDk2OCwxMy41NTk3NWMxLjExNDM1LTEuMjE4ODYsMy4yNjg1LS45MzAyOSw0LjQwODQuMjY0NzhhNi4wNDYxOCw2LjA0NjE4LDAsMCwxLDEuMzIwMDgsNC42MjYyOSwyMS40NjUxNiwyMS40NjUxNiwwLDAsMS0yLjIwMzY5LDcuMjA1MTEsMjEuNTM5ODUsMjEuNTM5ODUsMCwwLDAsMTIuNzY4NDMtMzguMzY5NVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjIwMy40MzY3MSIgY3k9Ijg3LjQ4MTA3IiByPSI1MSIgZmlsbD0iIzZjNjNmZiIvPjxwYXRoIGQ9Ik0yMDEuNzA4NzIsMzgzLjE2MzE5Yy0yNS41OTAwNy01Ni42MDM0NS0yNC42NDY1My0xMjguMzUxLDE1LjA2ODMzLTE3Ni4xMTU0MUEyODYuMjA3MzcsMjg2LjIwNzM3LDAsMCwwLDMxOS4yMTU3NiwzNzQuNzM0NGMyMC40NDY4MSwxNi4xNDQ4OCw0NC44Njk2NiwzMS45NzI4OCw1MC40NTUyNCw1Ny40MTk2NSwzLjQ3NTgsMTUuODMzNTItMS40NTA3NiwzMi41ODA5My05Ljk2NzYzLDQ2LjM3MzItOC41MTc2NCwxMy43OTI3My0yMC4zOSwyNS4xMzg1My0zMi4xMjczMywzNi4zMmwtMS4zMTY4OSwzLjgyNjQ4QzI3NS4xODYzNiw0ODMuMzEzMTgsMjI3LjI5ODc4LDQzOS43NjY2NCwyMDEuNzA4NzIsMzgzLjE2MzE5WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZjJmMmYyIi8+PHBhdGggZD0iTTIxNy44ODI0OSwyMDcuNzM4NDFjLTkuMTM5OSw1MC4wNDgzMy0yLjM1LDEwMy4zNDA2OSwxOS44NjU2NCwxNDkuMTk0MzYsNC44MDMsOS45MTM0NiwxMC41Mzc5NSwxOS41NTE4NiwxOC4yMTYyOCwyNy41MjUsNy42ODE3Niw3Ljk3NjcyLDE2Ljg2NjQ0LDEyLjk5ODA4LDI3LjQzMjIxLDE2LjA4Myw5LjY1OTI0LDIuODIwMjIsMTkuODY2MTksNC41ODY0MiwyOC42NzE2OCw5LjcwNTU1LDkuMjgxNDUsNS4zOTU4MiwxNS4wNDE0NSwxNC40NDk2MiwxNy4yODUzMSwyNC44MzIyNSwyLjc0NTQzLDEyLjcwMzQyLjc2MjU5LDI1LjYzNTczLTEuNjE2LDM4LjIxNTA2LTIuNjQwOTMsMTMuOTY2OTQtNS42MDUzMiwyOC40MzIzOC0xLjc3ODM3LDQyLjQ3Mjg2LjQ2MzY5LDEuNzAxMi0yLjIwMzExLDIuMzIxMjItMi42NjYxLjYyMjU5LTYuNjU4MjUtMjQuNDI4LDYuMjg3MS00OC41MjA2MSw0LjQ3NzYxLTczLjA4MDMyLS44NDQzNC0xMS40Ni01LjE0NzQxLTIyLjczNS0xNC45NzM1Ny0yOS4zNzQ4Ni04LjU5MjU0LTUuODA2MjYtMTkuMTE2NDgtNy42MzY1OS0yOC45MjEzNS0xMC40MDc1OS0xMC4yOTUyOS0yLjkwOTYtMTkuNTQxMTYtNy4zNTQtMjcuNDA4NzEtMTQuNzI2My04LjA0ODA4LTcuNTQxNDItMTQuMTcyLTE2Ljk3NTkzLTE5LjIwNzMyLTI2LjcyMzExLTExLjM1NTkzLTIxLjk4MjI1LTE4Ljg0MTg2LTQ2LjIwMTQ5LTIyLjgwMjQ1LTcwLjU4NmEyNDguOTY4MzcsMjQ4Ljk2ODM3LDAsMCwxLC44MDg3OC04NC41NjA0OWMuMzE1NzMtMS43Mjg4NCwyLjkzLS45MDk1LDIuNjE2MzMuODA4WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTIyOS43NDA3MiwzNDIuNDA5MTZBMzYuNzAyMzMsMzYuNzAyMzMsMCwwLDEsMTg1Ljg1OCwzMjQuMTYxYy0uNzk2MjgtMS41NzEyOSwxLjYwOC0yLjg4MjQ4LDIuNDA1MzUtMS4zMDkxYTMzLjk4NTU1LDMzLjk4NTU1LDAsMCwwLDQwLjg1NDgxLDE2Ljg5MTE1YzEuNjc1MDgtLjU0NTY0LDIuMjg4MDgsMi4xMjM1OC42MjI1OCwyLjY2NjFaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMjc4LjMxMDY2LDM5OS43NTU4NGE3MC43NDA3NSw3MC43NDA3NSwwLDAsMCw1LjcyMjMyLTUxLjIzNTI1Yy0uNDU3NjUtMS43MDI3OCwyLjIwOS0yLjMyMzMxLDIuNjY2MS0uNjIyNThhNzMuNTgxMDYsNzMuNTgxMDYsMCwwLDEtNi4wNjMsNTMuMzAyODFjLS44MjYxOSwxLjU1OTg3LTMuMTQ3MTUuMTA2NDItMi4zMjU0NS0xLjQ0NVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0yMTMuNDIyNTksMjY0LjM1MzUxYTIwLjc3NTI4LDIwLjc3NTI4LDAsMCwwLDE2LjI4MDc5LTExLjExNTMyYy44MDYtMS41Njk1OCwzLjEyNjIyLS4xMTQzOCwyLjMyNTQ1LDEuNDQ1YTIzLjI4MDQsMjMuMjgwNCwwLDAsMS0xNy45ODM2NSwxMi4zMzY0NCwxLjQxNDksMS40MTQ5LDAsMCwxLTEuNjQ0MzQtMS4wMjE3NiwxLjM3NTgzLDEuMzc1ODMsMCwwLDEsMS4wMjE3NS0xLjY0NDM0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTQyNy4wOTk0NiwyMDcuNjAyMjFjLS40NzU0Mi45OTQzOC0uOTUwODMsMS45ODg3Ni0xLjQxNTE1LDMuMDAzNDdhMjczLjU5NzY3LDI3My41OTc2NywwLDAsMC0xNS42MTc4Nyw0MS41NDNjLS4zMzIzNiwxLjA5NjU1LS42NTI2NiwyLjIxMjg1LS45NTI4MiwzLjMxNjY3YTI4OC40MzQ2NCwyODguNDM0NjQsMCwwLDAtOC43NjE3OCwxMDUuODMwODMsMjgwLjEwNjIsMjgwLjEwNjIsMCwwLDAsNy41OTg0Nyw0MS44NzU0NmM0Ljk2MDUzLDE4Ljk4Mjk0LDExLjg0OTQsMzkuMTcwNTksMTAuMjk0OTMsNTguMTI1NjZhNDguMDUzNzIsNDguMDUzNzIsMCwwLDEtLjc4NTg3LDUuODk1MjFsLTg2LjQyOTkzLDUyLjc5MDkzYy0uMjU2NjMuMDIxNC0uNTAyMjQuMDYzLS43NTk4My4wODVsLTMuMzU0NSwyLjI2NTU3Yy0uMjM0NzMtLjY5Ni0uNDYzMjEtMS40MjI4OC0uNjk3OTQtMi4xMTg4Ni0uMTM3ODMtLjQwMzE2LS4yNTY0MS0uODE4MDgtLjM5NDI1LTEuMjIxMjMtLjA4NTc5LS4yNzI1LS4xNzA3LS41NDU3MS0uMjYzNjktLjc4NjctLjAyODktLjA5MDYtLjA1NjgzLS4xODE3OC0uMDczNzQtLjI1Mjc2LS4wOTMtLjI0MS0uMTUzNzktLjQ3NDcyLS4yMzQ3Mi0uNjk2cS0xLjkzMjYtNi4wODk0LTMuNzg2MzEtMTIuMjI3MTVjLS4wMTIwNi0uMDE5NzQtLjAxMjA2LS4wMTk3NC0uMDA0ODYtLjA1MTI0LTkuMzM2Ny0zMS4yMDE3OS0xNi4xNTA1Ny02My40NTcxOC0xNy44NTIwOC05NS43MjEzNi0uMDUwODctLjk3MDczLS4xMTQ3Ni0xLjk2MDYxLS4xMjYxNS0yLjk1NTQ1YTI2Ny4yODQ1OCwyNjcuMjg0NTgsMCwwLDEsMS41MDY1Ny00My41OTIsMjM2LjI5MTMsMjM2LjI5MTMsMCwwLDEsNC4wNDYzNy0yMy41NjM2NSwxOTYuNDkyMTksMTk2LjQ5MjE5LDAsMCwxLDIyLjc2MzQyLTU3LjA2Mjk0YzIxLjAwMjMxLTM1LjMwMTE0LDUzLjA2MDc2LTYzLjQ5MjQzLDkyLjI5NjM0LTczLjcyOTc1QzQyNS4wOTgsMjA4LjA5Mzc2LDQyNi4wODM1LDIwNy44NDM2NCw0MjcuMDk5NDYsMjA3LjYwMjIxWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZjJmMmYyIi8+PHBhdGggZD0iTTQyNy41NzUxNywyMDguODE3ODZjLTM3LjQzMDI1LDM0LjQ1NzkzLTY0LjA5NDU3LDgxLjA5Njg5LTczLjk2MzcxLDEzMS4wODM4My0yLjEzMzY4LDEwLjgwNzA1LTMuMzU3NiwyMS45NTU2NC0yLjAyNzI3LDMyLjk0NDY0LDEuMzMwOTIsMTAuOTkzOTEsNS42NDExNiwyMC41MzMsMTIuMjIsMjkuMzU3NDQsNi4wMTQ0MSw4LjA2NzMyLDEzLjEwMDcxLDE1LjYyMjgyLDE3LjA0OTMzLDI1LjAxMTY3LDQuMTYyMDYsOS44OTYzNCwzLjMxMDA4LDIwLjU5MzIxLTEuMTQ5MzcsMzAuMjM0MTEtNS40NTYyNywxMS43OTU5MS0xNC44MjU2MSwyMC45Mjc4My0yNC4yOTgzOCwyOS41Mzk2Ni0xMC41MTc3LDkuNTYxOC0yMS41OTM3OSwxOS4zMjY4OC0yNi45OTE1MiwzMi44NDE1MS0uNjU0LDEuNjM3NDgtMy4xNTY1OS41MjY5My0yLjUwMzU3LTEuMTA4MDgsOS4zOTExMi0yMy41MTMxNCwzNC4yMzI2NS0zNC45NTU3Myw0Ny41NzQ1Mi01NS42NTQ3Miw2LjIyNTU2LTkuNjU4NTMsOS41NzgxMi0yMS4yNTE3Myw1LjczMDE0LTMyLjQ2OTMtMy4zNjQ5LTkuODA5MjgtMTAuNjY1NjktMTcuNjA2ODMtMTYuODI2LTI1LjcyMjUzLTYuNDY4NDMtOC41MjE2Mi0xMS4xNzQ4OC0xNy42MzY5MS0xMy4wMTgwNy0yOC4yNjAwNy0xLjg4NTQ4LTEwLjg2Njg5LTEuMDk0ODUtMjIuMDg2ODIuNzUzMTktMzIuOTAxLDQuMTY3NzYtMjQuMzg4NjUsMTIuNzcyMzItNDguMjMzNDEsMjQuMjkxMTgtNzAuMDg3NjRhMjQ4Ljk2ODI5LDI0OC45NjgyOSwwLDAsMSw1MS41NTctNjcuMDI5ODhjMS4yOTMtMS4xOTAyOSwyLjg4NywxLjAzNzg4LDEuNjAyNDksMi4yMjAzOVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0zNTUuOTYyMjIsMzIzLjQ4NDM5QTM2LjcwMjMzLDM2LjcwMjMzLDAsMCwxLDMzMS45MTEsMjgyLjQ5MzgyYy4zMTAyNC0xLjczNCwzLjAxOTM2LTEuMzMzMzcsMi43MDg3MS40MDI5NGEzMy45ODU1NSwzMy45ODU1NSwwLDAsMCwyMi40NTA2MywzOC4wODQwNmMxLjY2Ni41NzI4NS41NDgzNiwzLjA3MzE0LTEuMTA4MDcsMi41MDM1N1oiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0zNjAuMjE1OTMsMzk4LjUxNUE3MC43NDA3NCw3MC43NDA3NCwwLDAsMCwzOTUuNjMyLDM2MS4wNTE3MWMuNjU5NzgtMS42MzUxMSwzLjE2MjU2LS41MjUwNiwyLjUwMzU3LDEuMTA4MDhhNzMuNTgxMDYsNzMuNTgxMDYsMCwwLDEtMzYuOTMyOTEsMzguOTA5Yy0xLjU5ODgyLjc0ODA1LTIuNTc2OS0xLjgwOTgzLS45ODY3Ny0yLjU1MzgyWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTM4OS45MjgsMjUxLjMzNjY4YTIwLjc3NTI3LDIwLjc3NTI3LDAsMCwwLDE5LjY5MTQ4LjkyNzE5YzEuNTg4NTUtLjc2Nzk0LDIuNTY1LDEuNzkwODguOTg2NzcsMi41NTM4MmEyMy4yODA0MSwyMy4yODA0MSwwLDAsMS0yMS43ODYzMy0uOTc3NDQsMS40MTQ5MSwxLjQxNDkxLDAsMCwxLS42OTc3NS0xLjgwNTgyLDEuMzc1ODMsMS4zNzU4MywwLDAsMSwxLjgwNTgzLS42OTc3NVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik02MzEuNzA4NzIsMzIxLjE2MzE5Yy0yNS41OTAwNy01Ni42MDM0NS0yNC42NDY1My0xMjguMzUxLDE1LjA2ODMzLTE3Ni4xMTU0MUEyODYuMjA3MzcsMjg2LjIwNzM3LDAsMCwwLDc0OS4yMTU3NiwzMTIuNzM0NGMyMC40NDY4MSwxNi4xNDQ4OCw0NC44Njk2NiwzMS45NzI4OCw1MC40NTUyNCw1Ny40MTk2NSwzLjQ3NTgsMTUuODMzNTItMS40NTA3NiwzMi41ODA5My05Ljk2NzYzLDQ2LjM3MzItOC41MTc2NCwxMy43OTI3My0yMC4zOSwyNS4xMzg1My0zMi4xMjczMywzNi4zMmwtMS4zMTY4OSwzLjgyNjQ4QzcwNS4xODYzNiw0MjEuMzEzMTgsNjU3LjI5ODc4LDM3Ny43NjY2NCw2MzEuNzA4NzIsMzIxLjE2MzE5WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZjJmMmYyIi8+PHBhdGggZD0iTTY0Ny44ODI0OSwxNDUuNzM4NDFjLTkuMTM5OSw1MC4wNDgzMy0yLjM1LDEwMy4zNDA2OSwxOS44NjU2NCwxNDkuMTk0MzYsNC44MDMsOS45MTM0NiwxMC41MzgsMTkuNTUxODYsMTguMjE2MjgsMjcuNTI1LDcuNjgxNzYsNy45NzY3MiwxNi44NjY0NCwxMi45OTgwOCwyNy40MzIyMSwxNi4wODMsOS42NTkyNCwyLjgyMDIyLDE5Ljg2NjE5LDQuNTg2NDIsMjguNjcxNjgsOS43MDU1NSw5LjI4MTQ1LDUuMzk1ODIsMTUuMDQxNDUsMTQuNDQ5NjIsMTcuMjg1MzEsMjQuODMyMjUsMi43NDU0MywxMi43MDM0Mi43NjI1OSwyNS42MzU3My0xLjYxNiwzOC4yMTUwNi0yLjY0MDkzLDEzLjk2Njk0LTUuNjA1MzIsMjguNDMyMzgtMS43NzgzNyw0Mi40NzI4Ni40NjM2OSwxLjcwMTItMi4yMDMxMSwyLjMyMTIyLTIuNjY2MS42MjI1OS02LjY1ODI1LTI0LjQyOCw2LjI4NzEtNDguNTIwNjEsNC40Nzc2MS03My4wODAzMi0uODQ0MzQtMTEuNDYtNS4xNDc0MS0yMi43MzUtMTQuOTczNTctMjkuMzc0ODYtOC41OTI1NC01LjgwNjI2LTE5LjExNjQ4LTcuNjM2NTktMjguOTIxMzUtMTAuNDA3NTktMTAuMjk1MjktMi45MDk2LTE5LjU0MTE2LTcuMzU0LTI3LjQwODcxLTE0LjcyNjMtOC4wNDgwOC03LjU0MTQyLTE0LjE3Mi0xNi45NzU5My0xOS4yMDczMi0yNi43MjMxMS0xMS4zNTU5My0yMS45ODIyNS0xOC44NDE4Ni00Ni4yMDE0OS0yMi44MDI0NS03MC41ODZhMjQ4Ljk2ODM3LDI0OC45NjgzNywwLDAsMSwuODA4NzgtODQuNTYwNDljLjMxNTczLTEuNzI4ODQsMi45My0uOTA5NSwyLjYxNjMzLjgwOFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik02NTkuNzQwNzIsMjgwLjQwOTE2QTM2LjcwMjMzLDM2LjcwMjMzLDAsMCwxLDYxNS44NTgsMjYyLjE2MWMtLjc5NjI4LTEuNTcxMjksMS42MDgtMi44ODI0OCwyLjQwNTM1LTEuMzA5MWEzMy45ODU1NSwzMy45ODU1NSwwLDAsMCw0MC44NTQ4MSwxNi44OTExNWMxLjY3NTA4LS41NDU2NCwyLjI4ODA4LDIuMTIzNTguNjIyNTgsMi42NjYxWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTcwOC4zMTA2NiwzMzcuNzU1ODRhNzAuNzQwNzUsNzAuNzQwNzUsMCwwLDAsNS43MjIzMi01MS4yMzUyNWMtLjQ1NzY1LTEuNzAyNzgsMi4yMDktMi4zMjMzMSwyLjY2NjEtLjYyMjU4YTczLjU4MTA2LDczLjU4MTA2LDAsMCwxLTYuMDYzLDUzLjMwMjgxYy0uODI2MTksMS41NTk4Ny0zLjE0NzE1LjEwNjQyLTIuMzI1NDUtMS40NDVaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNjQzLjQyMjU5LDIwMi4zNTM1MWEyMC43NzUyOCwyMC43NzUyOCwwLDAsMCwxNi4yODA3OS0xMS4xMTUzMmMuODA2LTEuNTY5NTgsMy4xMjYyMi0uMTE0MzgsMi4zMjU0NSwxLjQ0NWEyMy4yODA0LDIzLjI4MDQsMCwwLDEtMTcuOTgzNjUsMTIuMzM2NDQsMS40MTQ5LDEuNDE0OSwwLDAsMS0xLjY0NDM0LTEuMDIxNzYsMS4zNzU4MywxLjM3NTgzLDAsMCwxLDEuMDIxNzUtMS42NDQzNFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik04NTcuMDk5NDYsMTQ1LjYwMjIxYy0uNDc1NDIuOTk0MzgtLjk1MDgzLDEuOTg4NzYtMS40MTUxNSwzLjAwMzQ3YTI3My41OTc2NywyNzMuNTk3NjcsMCwwLDAtMTUuNjE3ODcsNDEuNTQzYy0uMzMyMzYsMS4wOTY1NS0uNjUyNjYsMi4yMTI4NS0uOTUyODIsMy4zMTY2N2EyODguNDM0NjQsMjg4LjQzNDY0LDAsMCwwLTguNzYxNzgsMTA1LjgzMDgzLDI4MC4xMDYyLDI4MC4xMDYyLDAsMCwwLDcuNTk4NDcsNDEuODc1NDZjNC45NjA1MywxOC45ODI5NCwxMS44NDk0LDM5LjE3MDU5LDEwLjI5NDkzLDU4LjEyNTY2YTQ4LjA1MzcyLDQ4LjA1MzcyLDAsMCwxLS43ODU4Nyw1Ljg5NTIxbC04Ni40Mjk5Myw1Mi43OTA5M2MtLjI1NjYzLjAyMTQtLjUwMjI0LjA2My0uNzU5ODMuMDg1bC0zLjM1NDUsMi4yNjU1N2MtLjIzNDczLS42OTYtLjQ2MzIxLTEuNDIyODgtLjY5Nzk0LTIuMTE4ODYtLjEzNzgzLS40MDMxNi0uMjU2NDEtLjgxODA4LS4zOTQyNS0xLjIyMTIzLS4wODU3OS0uMjcyNS0uMTcwNy0uNTQ1NzEtLjI2MzY5LS43ODY3LS4wMjg5LS4wOTA2LS4wNTY4My0uMTgxNzgtLjA3Mzc0LS4yNTI3Ni0uMDkzLS4yNDEtLjE1Mzc5LS40NzQ3Mi0uMjM0NzItLjY5NnEtMS45MzI2LTYuMDg5NC0zLjc4NjMxLTEyLjIyNzE1Yy0uMDEyMDYtLjAxOTc0LS4wMTIwNi0uMDE5NzQtLjAwNDg2LS4wNTEyNC05LjMzNjctMzEuMjAxNzktMTYuMTUwNTctNjMuNDU3MTgtMTcuODUyMDgtOTUuNzIxMzYtLjA1MDg3LS45NzA3My0uMTE0NzYtMS45NjA2MS0uMTI2MTUtMi45NTU0NWEyNjcuMjg0NTgsMjY3LjI4NDU4LDAsMCwxLDEuNTA2NTctNDMuNTkyLDIzNi4yOTEzLDIzNi4yOTEzLDAsMCwxLDQuMDQ2MzctMjMuNTYzNjUsMTk2LjQ5MjE5LDE5Ni40OTIxOSwwLDAsMSwyMi43NjM0Mi01Ny4wNjI5NGMyMS4wMDIzMS0zNS4zMDExNCw1My4wNjA3Ni02My40OTI0Myw5Mi4yOTYzNC03My43Mjk3NUM4NTUuMDk4LDE0Ni4wOTM3Niw4NTYuMDgzNSwxNDUuODQzNjQsODU3LjA5OTQ2LDE0NS42MDIyMVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2YwZjBmMCIvPjxwYXRoIGQ9Ik04NTcuNTc1MTcsMTQ2LjgxNzg2Yy0zNy40MzAyNSwzNC40NTc5My02NC4wOTQ1Nyw4MS4wOTY4OS03My45NjM3MSwxMzEuMDgzODMtMi4xMzM2OCwxMC44MDcwNS0zLjM1NzYsMjEuOTU1NjQtMi4wMjcyNywzMi45NDQ2NCwxLjMzMDkyLDEwLjk5MzkxLDUuNjQxMTYsMjAuNTMzLDEyLjIyLDI5LjM1NzQ0LDYuMDE0NDEsOC4wNjczMiwxMy4xMDA3MSwxNS42MjI4MiwxNy4wNDkzMywyNS4wMTE2Nyw0LjE2MjA2LDkuODk2MzQsMy4zMTAwOCwyMC41OTMyMS0xLjE0OTM3LDMwLjIzNDExLTUuNDU2MjcsMTEuNzk1OTEtMTQuODI1NjEsMjAuOTI3ODMtMjQuMjk4MzgsMjkuNTM5NjYtMTAuNTE3Nyw5LjU2MTgtMjEuNTkzNzksMTkuMzI2ODgtMjYuOTkxNTIsMzIuODQxNTEtLjY1NCwxLjYzNzQ4LTMuMTU2NTkuNTI2OTMtMi41MDM1Ny0xLjEwODA4LDkuMzkxMTItMjMuNTEzMTQsMzQuMjMyNjUtMzQuOTU1NzMsNDcuNTc0NTItNTUuNjU0NzIsNi4yMjU1Ni05LjY1ODUzLDkuNTc4MTItMjEuMjUxNzMsNS43MzAxNC0zMi40NjkzLTMuMzY0OS05LjgwOTI4LTEwLjY2NTY5LTE3LjYwNjgzLTE2LjgyNi0yNS43MjI1My02LjQ2ODQzLTguNTIxNjItMTEuMTc0ODgtMTcuNjM2OTEtMTMuMDE4MDctMjguMjYwMDctMS44ODU0OC0xMC44NjY4OS0xLjA5NDg1LTIyLjA4NjgyLjc1MzE5LTMyLjkwMSw0LjE2Nzc2LTI0LjM4ODY1LDEyLjc3MjMyLTQ4LjIzMzQxLDI0LjI5MTE4LTcwLjA4NzY0YTI0OC45NjgyOSwyNDguOTY4MjksMCwwLDEsNTEuNTU3LTY3LjAyOTg4YzEuMjkzLTEuMTkwMjksMi44ODcsMS4wMzc4OCwxLjYwMjQ5LDIuMjIwMzlaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNzg1Ljk2MjIyLDI2MS40ODQzOUEzNi43MDIzMywzNi43MDIzMywwLDAsMSw3NjEuOTExLDIyMC40OTM4MmMuMzEwMjQtMS43MzQsMy4wMTkzNi0xLjMzMzM3LDIuNzA4NzEuNDAyOTRhMzMuOTg1NTUsMzMuOTg1NTUsMCwwLDAsMjIuNDUwNjMsMzguMDg0MDZjMS42NjYuNTcyODUuNTQ4MzYsMy4wNzMxNC0xLjEwODA3LDIuNTAzNTdaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNzkwLjIxNTkzLDMzNi41MTVBNzAuNzQwNzQsNzAuNzQwNzQsMCwwLDAsODI1LjYzMiwyOTkuMDUxNzFjLjY1OTc4LTEuNjM1MTEsMy4xNjI1Ni0uNTI1MDYsMi41MDM1NywxLjEwODA4YTczLjU4MTA2LDczLjU4MTA2LDAsMCwxLTM2LjkzMjkxLDM4LjkwOWMtMS41OTg4Mi43NDgwNS0yLjU3NjktMS44MDk4My0uOTg2NzctMi41NTM4MloiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik04MTkuOTI4LDE4OS4zMzY2OGEyMC43NzUyNywyMC43NzUyNywwLDAsMCwxOS42OTE0OC45MjcxOWMxLjU4ODU1LS43Njc5NCwyLjU2NSwxLjc5MDg4Ljk4Njc3LDIuNTUzODJhMjMuMjgwNDEsMjMuMjgwNDEsMCwwLDEtMjEuNzg2MzMtLjk3NzQ0LDEuNDE0OTEsMS40MTQ5MSwwLDAsMS0uNjk3NzUtMS44MDU4MiwxLjM3NTgzLDEuMzc1ODMsMCwwLDEsMS44MDU4My0uNjk3NzVaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMzA1LjU0OTIxLDc0MC45NTM1M2w5LjQ0NjczLDcuMzE2MTksMzYuNzI5MDYsNi4zNzI3OUwzOTIuNTQ5MjEsNjUzLjE2MjJzMjUtNzguMjA4NjcsOTUtNjIuMjA4NjdsMjI1LTRzNjkuMDgzMzgtNy4wODAyNSw4MC41LDI1LjVjMi4xNjI0NCw2LjE3MTA4LDYwLjUsMTQyLjUsNjAuNSwxNDIuNWw0MC45MDE1OC01Ljc3MjkyLTQuOTAxNTgtMTE2LjIyNzA4LTk3LjE0NTY3LTIyNS41LTE2OC44NTQzMy0xMC41NDMzLTE3NCwxMi4wNDMzWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjM2YzZDU2Ii8+PGNpcmNsZSBjeD0iMzUwLjkzNjcxIiBjeT0iMzg4Ljk4MTA3IiByPSI2NSIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjU2OC45MzY3MSIgY3k9IjM4OC45ODEwNyIgcj0iNjUiIGZpbGw9IiMyZjJlNDEiLz48cGF0aCBkPSJNNDE2LjU0OTIxLDMxOS45NTM1M2wyNi43NjM0LTUuMjQ4czIwMS41MDQzMi0yOC43NTIsMzI4Ljg3MDQ2LDUuMjQ4bC05LjYzMzg2LDI3LTMzNy0yWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZTZlNmU2Ii8+PHBhdGggZD0iTTY4OC4yMzgxOCw0NTkuNDUzNTNINTE3LjIyOTM5Yy0yMC43NjM2NywwLTM4LjcwOS0xNC4zNzc0NC00Mi42Njk5Mi0zNC4xODY1MmwtMTguNzE0ODUtOTMuNjA0YTE0Ljk5MDgxLDE0Ljk5MDgxLDAsMCwxLDIuNTkwMzMtMTEuODI0MjIsMTUuOTM3OTIsMTUuOTM3OTIsMCwwLDEsMTAuOTQ4NzQtNi40MzIxM2M5MC4xOTIzOC0xMS4xOTUzMSwxNzkuNTAxOTUtMTEuMjE0MzYsMjY1LjQ1MDE5LS4wNTgxMWExNS42OTkxNCwxNS42OTkxNCwwLDAsMSwxMC43OSw2LjM1MTU3LDE1LjAxMjg1LDE1LjAxMjg1LDAsMCwxLDIuNjcxMzksMTEuNjcyMzZsLTE3LjI3NTg4LDkzLjMxNjg5QzcyNy4yOTA0Miw0NDQuODMyOTMsNzA5LjI5ODI0LDQ1OS40NTM1Myw2ODguMjM4MTgsNDU5LjQ1MzUzWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjNmM2M2ZmIi8+PHBhdGggZD0iTTM0MC40Nzg5LDMzNS4xOTI3OWwuNzQ0NjMtMTMuMzk1YTEyLjkzNTUsMTIuOTM1NSwwLDAsMSw2LjE0ODkyLTEwLjMwNjE1YzEwLjc5NzM3LTYuNjI0LDM5LjkyMzM0LTIxLjIwOCw3Ny4wOTIyOS0xMy41NjNhMTIuOTc2NzYsMTIuOTc2NzYsMCwwLDEsMTAuMjEyNCwxMC44NDYxOWwuOTk1MTIsNi45Njk3M1oiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzNmM2Q1NiIvPjxwYXRoIGQ9Ik04NjQuNjE5NTMsMzM1LjE5Mjc5bC05NS4xOTMzNi0xOS40NDgyNCwxLjU5OTEyLTExLjE5NzI3QTYuNjkxODEsNi42OTE4MSwwLDAsMSw3NzYuMDM2LDI5OC45NzhjNDIuODY1MjMtMTAuNzU3MzMsNzUuNjc1NzgsOC4zNDYxOSw4NC43MTE0MiwxNC40NTc1MmE2Ljc2MTQ4LDYuNzYxNDgsMCwwLDEsMi45NTE2Niw1LjE5NzI2WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjM2YzZDU2Ii8+PHBhdGggZD0iTTMxMC4yNTM4LDc0OS42ODg4OWExMS45OTUyOCwxMS45OTUyOCwwLDAsMS02LjQ5MTctMS44MjYxOGMtMjUuNDg4NzctMTQuODgzNzktNDEuMzc5MzktNDIuMTU5MTgtNDcuMTk0MzMtODEuMDQ1ODktNC44MDMyMy0zMi4xMjExLTIuNzk3MzctNzIuNDM4NDgsNS45NjE0Mi0xMTkuODMzQzI3OC4wNTgsNDYyLjk1NywzMTAuNjA0ODgsMzc4Ljk2NzY5LDMyMy44NzczNCwzNDYuNzU3NzNhMjkuMzc1NjIsMjkuMzc1NjIsMCwwLDEsMjAuMDcwOC0xNy4yODQxOGMyNy4zNjE4MS02LjczLDc1LjEyNjk1LTE4LjAyLDg3LjYwMTA3LTE4LjAyLDE3LjA5NDczLDAsMjYuMzQ0MjQsMTYuMDkyMjksMjYuNDM2LDE2LjI1NDg5bC4wNTEyNy4xMzI4MSwxNS4wMTI2OSw2NS4xMDA1OXYuOTM5NDVjOC4yODIyMywyOC4wMjI0NiwyLjEyODQyLDQ4LjI2NTEzLTQuNDk3MDcsNjAuMzEzLTcuMTkwOTIsMTMuMDc3MTQtMTYuNDk1NiwxOS42MDYtMTYuNTg4MzgsMTkuNjcwNDEtMTQuNjEwODQsMTEuMTIzLTM4LjQxNSw0Ni45NTYwNS02Mi4xMDU0Nyw5My41MDI5My0yNC42MTg2NSw0OC4zNzIwNy00Mi44Njg2NSw5Ni4xMDE1Ni00OC44MTc4NywxMjcuNjc4NzEtNy4yODE3MywzOC42NDk0MS0xNy45NTYwNSw1MC40ODE0NC0yNS42Mjg0MSw1My42MDA1OEExMy42MDIsMTMuNjAyLDAsMCwxLDMxMC4yNTM4LDc0OS42ODg4OVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2U2ZTZlNiIvPjxwYXRoIGQ9Ik02ODIuNjAxLDQ1MS40NTM1M0g1MjEuMDIwODlhNDEuMTY3OCw0MS4xNjc4LDAsMCwxLTQwLjM0NDcyLTMzLjI2MjJsLTE3LjY4MzExLTkxLjAzNjE0YTE1LjAxOTc0LDE1LjAxOTc0LDAsMCwxLDEyLjgxNDQ1LTE3Ljc2ODU1Yzg1LjIyNDEyLTEwLjg4ODE4LDE2OS42MTM3Ny0xMC45MDY3NCwyNTAuODI1Mi0uMDU2NjRhMTUuMDA1NTEsMTUuMDA1NTEsMCwwLDEsMTIuNzQxMjEsMTcuNTQzTDcyMy4wNTA2OCw0MTcuNjI5OEE0MS4wNjQ4OSw0MS4wNjQ4OSwwLDAsMSw2ODIuNjAxLDQ1MS40NTM1M1oiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2U2ZTZlNiIvPjxwYXRoIGQ9Ik04OTQuODQ4LDc0OS42ODk4NmExMy42MDg5MiwxMy42MDg5MiwwLDAsMS01LjE2MTYyLTEuMDQzYy03LjY3MjM2LTMuMTE5MTQtMTguMzQ2NjgtMTQuOTUxMTctMjUuNjI4NDItNTMuNjAwNTgtNS45NDkyMi0zMS41NzcxNS0yNC4xOTkyMi03OS4zMDY2NC00OC44MTc4Ny0xMjcuNjc4NzEtMjMuNjkwNDMtNDYuNTQ2ODgtNDcuNDk0NjMtODIuMzc5ODktNjIuMTIzNTMtOTMuNTE2MTItLjA3NDcxLS4wNTEyNy05LjM3OTQtNi41ODAwOC0xNi41NzAzMi0xOS42NTcyMi02LjYyNTQ5LTEyLjA0Nzg2LTEyLjc3OTI5LTMyLjI5MDUzLTQuNDk3MDctNjAuMzEzbC4wMTI3LTEuMDUxNzZMNzQ3LjA3OCwzMjcuNzcwOTJsLjAzNTE2LS4wNjI1Yy4wOTE3OS0uMTYyNiw5LjM0MTMxLTE2LjI1NDg5LDI2LjQzNi0xNi4yNTQ4OSwxMi40NzQxMiwwLDYwLjIzOTI2LDExLjI5LDg3LjYwMTA4LDE4LjAyYTI5LjM3OTkzLDI5LjM3OTkzLDAsMCwxLDIwLjA3MDgsMTcuMjg0MThoMGMxMy4yNzI0NiwzMi4yMSw0NS44MTkzMywxMTYuMTk5MjIsNjEuMzQ4MTQsMjAwLjIyNjA4LDguNzU4NzksNDcuMzk0NTMsMTAuNzY0NjUsODcuNzExOTEsNS45NjE0MywxMTkuODMzLTUuODE0OTQsMzguODg2NzEtMjEuNzA1NTcsNjYuMTYyMS00Ny4yMjk0OSw4MS4wNjgzNUExMS45NDgsMTEuOTQ4LDAsMCwxLDg5NC44NDgsNzQ5LjY4OTg2WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZTZlNmU2Ii8+PGNpcmNsZSBjeD0iMzUwLjkzNjcxIiBjeT0iMzc3Ljk4MTA3IiByPSIzOSIgZmlsbD0iIzNmM2Q1NiIvPjxjaXJjbGUgY3g9IjM1MC45MzY3MSIgY3k9IjM3Ny45ODEwNyIgcj0iMjYiIGZpbGw9IiMyZjJlNDEiLz48Y2lyY2xlIGN4PSI1NjguOTM2NzEiIGN5PSIzNzcuOTgxMDciIHI9IjM5IiBmaWxsPSIjM2YzZDU2Ii8+PGNpcmNsZSBjeD0iNTY4LjkzNjcxIiBjeT0iMzc3Ljk4MTA3IiByPSIyNiIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQzNS45MzY3MSIgY3k9IjMyNy45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQ0OC45MzY3MSIgY3k9IjMyNy45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQ0Mi45MzY3MSIgY3k9IjMzOC45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQ1NC45MzY3MSIgY3k9IjMzOC45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQ2Ni45MzY3MSIgY3k9IjMzOC45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQ3OC45MzY3MSIgY3k9IjMzOC45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQ2MS45MzY3MSIgY3k9IjMyNy45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQ3NC45MzY3MSIgY3k9IjMyNy45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxjaXJjbGUgY3g9IjQ4Ny45MzY3MSIgY3k9IjMyNy45ODEwNyIgcj0iMyIgZmlsbD0iIzJmMmU0MSIvPjxwYXRoIGQ9Ik02MTUuNTQ5MjEsNTY0LjQ1MzUzaC0yNmE0LjUsNC41LDAsMSwxLDAtOWgyNmE0LjUsNC41LDAsMCwxLDAsOVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzJmMmU0MSIvPjxwYXRoIGQ9Ik00NDMuMzkzLDM2OC44Mzk3NmE3LjQ2NDMxLDcuNDY0MzEsMCwwLDEtNy4yNDQxNC01Ljc0OTUxbC0zLjk4NzMtMTYuOTI4MjJhNy40NTY5NSw3LjQ1Njk1LDAsMCwxLDE0LjUxNjYtMy40MTk0M2wzLjk4NzMsMTYuOTI4MjJhNy40NjY5NSw3LjQ2Njk1LDAsMCwxLTcuMjcyNDYsOS4xNjg5NFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzNmM2Q1NiIvPjxwYXRoIGQ9Ik03NjIuNzA1NDYsMzY3LjgzOTc2YTcuNDY3LDcuNDY3LDAsMCwxLTcuMjcyNDYtOS4xNjg5NGwzLjk4NzMxLTE2LjkyODIyYTcuNDU2OTUsNy40NTY5NSwwLDAsMSwxNC41MTY2LDMuNDE5NDNsLTMuOTg3MzEsMTYuOTI4MjJhNy40NjQzMSw3LjQ2NDMxLDAsMCwxLTcuMjQ0MTQsNS43NDk1MVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzNmM2Q1NiIvPjxwYXRoIGQ9Ik0zODguMzc3ODMsNDE4LjgwNzA1YTExLjk0MjQ5LDExLjk0MjQ5LDAsMCwxLTYuODU3OTEtMi4xNjM1N2wtOC4zNjk2My01Ljg1ODg5YTExLjk2ODIxLDExLjk2ODIxLDAsMCwxLTUuMTAxMDgtOS43OTczNlYzODMuMDQzODdhMTMuNjA1ODMsMTMuNjA1ODMsMCwwLDEsMTMuNTkwMzMtMTMuNTkwMzRoMTIuODE5MzRhMTMuNjA1ODMsMTMuNjA1ODMsMCwwLDEsMTMuNTkwMzMsMTMuNTkwMzR2MTguMTE5NjJhMTIuMDAyMjcsMTIuMDAyMjcsMCwwLDEtNC44NjUyMyw5LjYyN2wtNy43MTI0LDUuNjgzMUExMS45NDE1NywxMS45NDE1NywwLDAsMSwzODguMzc3ODMsNDE4LjgwNzA1WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjM2YzZDU2Ii8+PHBhdGggZD0iTTM5NC40NTg4OCw0ODQuNDUzNTNIMzgxLjYzOTU0YTEzLjYwNTgzLDEzLjYwNTgzLDAsMCwxLTEzLjU5MDMzLTEzLjU5MDMzVjQ1Mi45MTk4NGExMS45NjgyMSwxMS45NjgyMSwwLDAsMSw1LjEwMTA4LTkuNzk3MzZsOC4zNjk2My01Ljg1ODg5YTExLjk1LDExLjk1LDAsMCwxLDEzLjk1MTY2LjE2OTkybDcuNzEyNCw1LjY4MzExYTEyLjAwMjI2LDEyLjAwMjI2LDAsMCwxLDQuODY1MjMsOS42MjY5NVY0NzAuODYzMkExMy42MDU4MywxMy42MDU4MywwLDAsMSwzOTQuNDU4ODgsNDg0LjQ1MzUzWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjM2YzZDU2Ii8+PHBhdGggZD0iTTQzNC40NTg4OCw0NDYuOTUzNTNINDE2LjUxNTUyYTExLjk2ODIsMTEuOTY4MiwwLDAsMS05Ljc5NzM2LTUuMTAxMDdsLTUuODU4ODktOC4zNjk2M2ExMS45NDkxOCwxMS45NDkxOCwwLDAsMSwuMTY5OTItMTMuOTUxNjZsNS42ODMxMS03LjcxMjRhMTIuMDAyMjQsMTIuMDAyMjQsMCwwLDEsOS42MjY5NS00Ljg2NTI0aDE4LjExOTYzYTEzLjYwNTgzLDEzLjYwNTgzLDAsMCwxLDEzLjU5MDMzLDEzLjU5MDM0VjQzMy4zNjMyQTEzLjYwNTgzLDEzLjYwNTgzLDAsMCwxLDQzNC40NTg4OCw0NDYuOTUzNTNaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiMzZjNkNTYiLz48cGF0aCBkPSJNMzU4LjU4MjksNDQ2Ljk1MzUzSDM0MC42Mzk1NGExMy42MDU4MywxMy42MDU4MywwLDAsMS0xMy41OTAzMy0xMy41OTAzM1Y0MjAuNTQzODdhMTMuNjA1ODMsMTMuNjA1ODMsMCwwLDEsMTMuNTkwMzMtMTMuNTkwMzRoMTguMTE5NjNhMTIuMDAyMjYsMTIuMDAyMjYsMCwwLDEsOS42MjcsNC44NjUyNGw1LjY4MzEsNy43MTI0YTExLjk0OTE4LDExLjk0OTE4LDAsMCwxLC4xNjk5MiwxMy45NTE2NmwtNS44NTg4OCw4LjM2OTYzQTExLjk2ODIsMTEuOTY4MiwwLDAsMSwzNTguNTgyOSw0NDYuOTUzNTNaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiMzZjNkNTYiLz48Y2lyY2xlIGN4PSI2NzUuOTM2NzEiIGN5PSIyMzEuOTgxMDciIHI9IjIzIiBmaWxsPSIjM2YzZDU2Ii8+PGNpcmNsZSBjeD0iNzI2LjkzNjcxIiBjeT0iMjg0Ljk4MTA3IiByPSIyMyIgZmlsbD0iIzNmM2Q1NiIvPjxjaXJjbGUgY3g9IjY3NS45MzY3MSIgY3k9IjMzNC45ODEwNyIgcj0iMjMiIGZpbGw9IiMzZjNkNTYiLz48Y2lyY2xlIGN4PSI2MjQuOTM2NzEiIGN5PSIyODMuOTgxMDciIHI9IjIzIiBmaWxsPSIjM2YzZDU2Ii8+PHBhdGggZD0iTTg2OC41NDkyMSw0NDMuOTUzNTNhMTUsMTUsMCwxLDEsMTUtMTVBMTUuMDE3LDE1LjAxNywwLDAsMSw4NjguNTQ5MjEsNDQzLjk1MzUzWm0wLTI4YTEzLDEzLDAsMSwwLDEzLDEzQTEzLjAxNDQzLDEzLjAxNDQzLDAsMCwwLDg2OC41NDkyMSw0MTUuOTUzNTNaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNlNmU2ZTYiLz48cGF0aCBkPSJNODMzLjYyMTQ4LDM4Ny4xMTMybC0zMC4xNDQ1My0uNDI2MjcsMTUuNDQxODktMjUuODkzMDZabS0yNi42NTIzNS0yLjM3NzQ0LDIzLjIxNjguMzI4NjEtMTEuMzIzNzMtMjAuMjcwNVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iI2U2ZTZlNiIvPjxwYXRoIGQ9Ik03NzguNTQ5MjEsNDM5Ljk1MzUzaC0yNHYtMjRoMjRabS0yMi0yaDIwdi0yMGgtMjBaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNlNmU2ZTYiLz48cG9seWdvbiBwb2ludHM9IjY4OC4zNDggMzQ1LjMwNyA2NzcuMzUzIDMzNC4zMzMgNjg3LjA0OSAzMjQuNjU1IDY4NS42MzUgMzIzLjIzOSA2NzUuOTM3IDMzMi45MTkgNjY2LjIzOCAzMjMuMjM5IDY2NC44MjUgMzI0LjY1NSA2NzQuNTIxIDMzNC4zMzMgNjYzLjUyNiAzNDUuMzA3IDY2NC45MzkgMzQ2LjcyMyA2NzUuOTM3IDMzNS43NDYgNjg2LjkzNSAzNDYuNzIzIDY4OC4zNDggMzQ1LjMwNyIgZmlsbD0iI2U2ZTZlNiIvPjxwYXRoIGQ9Ik0zODguMzQ0NDksMjE3LjgxMjEyYTE1LDE1LDAsMSwxLDE1LTE1QTE1LjAxNywxNS4wMTcsMCwwLDEsMzg4LjM0NDQ5LDIxNy44MTIxMlptMC0yOGExMywxMywwLDEsMCwxMywxM0ExMy4wMTQ0MywxMy4wMTQ0MywwLDAsMCwzODguMzQ0NDksMTg5LjgxMjEyWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZTZlNmU2Ii8+PHBhdGggZD0iTTM1NC40MTY3NSwxOTIuOTcxNzlsLTMwLjE0NDUzLS40MjYyNywxNS40NDE5LTI1Ljg5MzA2Wm0tMjYuNjUyMzQtMi4zNzc0NCwyMy4yMTY4LjMyODYxLTExLjMyMzczLTIwLjI3MDVaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNlNmU2ZTYiLz48cGF0aCBkPSJNMzEwLjA0OTIxLDIyOS40NTM1M2gtMjR2LTI0aDI0Wm0tMjItMmgyMHYtMjBoLTIwWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjZTZlNmU2Ii8+PHBvbHlnb24gcG9pbnRzPSIxOTAuMTQzIDEzMC4xNjUgMTc5LjE0OCAxMTkuMTkxIDE4OC44NDQgMTA5LjUxNCAxODcuNDMxIDEwOC4wOTggMTc3LjczMiAxMTcuNzc4IDE2OC4wMzMgMTA4LjA5OCAxNjYuNjIgMTA5LjUxNCAxNzYuMzE2IDExOS4xOTEgMTY1LjMyMSAxMzAuMTY1IDE2Ni43MzQgMTMxLjU4MSAxNzcuNzMyIDEyMC42MDQgMTg4LjczIDEzMS41ODEgMTkwLjE0MyAxMzAuMTY1IiBmaWxsPSIjZTZlNmU2Ii8+PHBvbHlnb24gcG9pbnRzPSI4NjcuNDM3IDM0NC40ODEgODI4LjYyMiAzNzMuNjk0IDg3Mi40MzcgMzU0LjQ4MSA4NjcuNDM3IDM0NC40ODEiIG9wYWNpdHk9IjAuMiIvPjxwb2x5Z29uIHBvaW50cz0iMTQ5LjQzNyAzODAuNDgxIDEwMC40MzcgMzgyLjQ4MSA5NC40MzcgMzQ5LjQ4MSAxMzYuNDM3IDMzNi40ODEgMTQ5LjQzNyAzODAuNDgxIiBmaWxsPSIjYTA2MTZhIi8+PHBhdGggZD0iTTI3My4wMzQxOSw0NDMuNTc3NWwtMTAuOTI5MTItMTEuMTI4MjksMTMuNDAwNTgtMjAuNDg5OTQsMjIuOTM1OTUtMzguMTc4ODZhOC45MjU3OCw4LjkyNTc4LDAsMSwxLDEwLjkwMzk0LDQuNzgwNDdsLTE4LjkzMTY4LDQwLjc1OTI1WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjYTA2MTZhIi8+PHBhdGggZD0iTTI2MC45Mjc0MSw0NjguOTgyNGExMi4zMTY4NSwxMi4zMTY4NSwwLDAsMS0xMi4xNTIsNS41MDIyOCwxMS41MTUxMywxMS41MTUxMywwLDAsMS05LjY3NTE1LTguMTEwMzYsMTAuOTc5MTMsMTAuOTc5MTMsMCwwLDEsMS4yMDk2OC05LjE2NjM5YzcuMzExMjgtMTIuMzI1MjEsMjAuNzk1NzUtMjguNjAyMjksMjAuOTMwOTQtMjguNzY0ODlsLjIxNDcyLS4yNTg4NSwyMi43NDMyOSw0LjkyNzQ0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjNmM2M2ZmIi8+PHBvbHlnb24gcG9pbnRzPSIxMzcuNzU4IDU5Ny43NzIgMTUxLjM0NyA1OTcuNzcxIDE1Ny44MTEgNTQ1LjM1NiAxMzcuNzU1IDU0NS4zNTcgMTM3Ljc1OCA1OTcuNzcyIiBmaWxsPSIjYTA2MTZhIi8+PHBhdGggZD0iTTI3NS45MDM3MSw3MzcuMzA3ODNsMjYuNzYxODktLjAwMTA5aC4wMDEwOGExNy4wNTU2OSwxNy4wNTU2OSwwLDAsMSwxNy4wNTQ3NywxNy4wNTQ1MXYuNTU0MjFsLTQzLjgxNjkzLjAwMTYyWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjMmYyZTQxIi8+PHBvbHlnb24gcG9pbnRzPSIzMS45NDggNTkxLjg5IDQ1LjM4NCA1OTMuOTIgNTkuNjEyIDU0My4wNjEgNDEuOTk4IDU0MC4wNjMgMzEuOTQ4IDU5MS44OSIgZmlsbD0iI2EwNjE2YSIvPjxwYXRoIGQ9Ik0xNzAuNzk2MjcsNzMwLjk1NzA1bDI2LjQ2MTM0LDMuOTk5NTIuMDAxMDcuMDAwMTdhMTcuMDU1NywxNy4wNTU3LDAsMCwxLDE0LjMxMzY5LDE5LjQxMjM2bC0uMDgyODUuNTQ4LTQzLjMyNDgzLTYuNTQ4NTJaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiMyZjJlNDEiLz48cGF0aCBkPSJNMjQwLjA0OTIxLDUxNi40NTM1M2w0Ny04TDMwMS41OTE3LDUzOC40Mjk2bC41NTQyMiwxOTUuNjM3MjQtMjUuNzk1MTItLjE2MTQ2LTEwLjc4Mjk1LTE1OC4zNDM1TDE5Ni44NDU0Miw3MjEuODc0MTVsLTI3LjcxMDY2LTMuMzI1MjdMMjI5LjU0NCw1NjEuNzA2NTZzLTMuMzI1MjctMjcuNzEwNjYsNy4yMDQ3OC00MS41NjZaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiMyZjJlNDEiLz48cGF0aCBkPSJNMjIyLjYwMDg2LDQ1Ny4zOTQ2NGExMS43NDM1MSwxMS43NDM1MSwwLDAsMSwzLjIzOS0xMi4zOTUxMWw2LjY3OTUxLTYuMDcxNDUsMTguODMxLTMuMTcyNjUsMTEuNzc0MzItMi4xNCwxOC45MjQ2LDU0LjgzODEtNDUuOTYzMTQsMjEuMTE3MjVjLTQuMDMzNzYtLjg3MDkxLTUuNjQ1LTMuMDc3NC0zLjI5NzkxLTcuNDY0NzdaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiM2YzYzZmYiLz48cGF0aCBkPSJNMjY0Ljc4MzY2LDQ3NS44OTgzNWwxMy4xNDgzMy04LjM5MDgyLDE3LjI3NDgzLDE3LjM0OTE3TDMyNy44MTU1Niw1MTUuMTk0YTguOTI1NzgsOC45MjU3OCwwLDEsMS02LjkzMjU5LDkuNjc5MjVsLTM1Ljk2MTYyLTI2Ljk1MzQxWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0MS42MTI1IC0xNDMuOTcyNDYpIiBmaWxsPSIjYTA2MTZhIi8+PHBhdGggZD0iTTI0Mi40MzIyOSw0NTguNzk3NGExMi4zMTU0NSwxMi4zMTU0NSwwLDAsMS0yLjg2OTE1LTEzLjAyNjQsMTEuNTIxMzUsMTEuNTIxMzUsMCwwLDEsOS45MzYyNS03Ljc4ODE2LDEwLjk3OTM1LDEwLjk3OTM1LDAsMCwxLDguNzE3ODIsMy4wNzk1NWMxMC41NDYsOS43MDI0NCwyMy42ODE5MywyNi4yNjI4NCwyMy44MTMxMiwyNi40Mjg0MWwuMjA4NTguMjYzNjktOS41MjUzOCwyMS4yMzE4NVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzZjNjNmZiIvPjxjaXJjbGUgY3g9IjEwMS40NzM2IiBjeT0iMjY0LjQ0MDQxIiByPSIyMC42NzA5MiIgZmlsbD0iI2EwNjE2YSIvPjxwYXRoIGQ9Ik0yMjYuMzUwNjMsNDM3Ljg2MWE3OS4xOTYxNyw3OS4xOTYxNywwLDAsMS05LjU4OTg3LS41ODQ1OWwtLjQzNjI2LS4wNTMxNUwyMTIuOTk0OTIsNDE5LjE0N2EzMC40OTY0MiwzMC40OTY0MiwwLDAsMSwyMi43ODk1LTM1LjE2MDg3LDIuODMzNjIsMi44MzM2MiwwLDAsMSwyLjgyMTk0Ljg3MzY4bC43OTQxLS4yNzY4MmEyNC41MTgzMSwyNC41MTgzMSwwLDAsMSwzMS4yMjQ1LDE1LjA3ODUzbC4xOTY4MS41NjQ3NC01LjI5OTMsMS44NDc4MWExMS43NjU5MiwxMS43NjU5MiwwLDAsMC02LjIxMiwxNy4xNjgxMmw1LjQxODE1LDkuMDItLjU3Njg2LjI4OTA5QTgzLjc0ODksODMuNzQ4OSwwLDAsMSwyMjYuMzUwNjMsNDM3Ljg2MVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDEuNjEyNSAtMTQzLjk3MjQ2KSIgZmlsbD0iIzJmMmU0MSIvPjxwYXRoIGQ9Ik05MzYuNTA5MjcsNTI0LjM2MTg2YTguMDcyMzUsOC4wNzIzNSwwLDAsMSwxMC45MDQtNS44NTgxMWwxOC44MDAxLTIxLjY2NzI0LDQuMDIxMjgsMTQuMzU0MzctMTguNDY5NDQsMTguMzc0ODhhOC4xMTYxMiw4LjExNjEyLDAsMCwxLTE1LjI1Ni01LjIwMzlaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNmZmI2YjYiLz48cGF0aCBpZD0iZmIzOWI3YjktZjY5Yy00MGI2LTlmNDAtODU3M2E3MmIyNDdkLTU0IiBkYXRhLW5hbWU9ImYzNDhmODFmLWI5NjEtNGFlNC1iYzZiLTc1OGY2YWNmYjEyYSIgZD0iTTEwMjAuNDAwNDYsNDI5LjEwMjYzbDcuNzAyLS40MTY1LDEuMTU5OTMsNC44OTU3MXMtLjExNDM0LDYuMjY4NzEtNy4xMzY4MSwxOS4yOTktNjEuNDMzNzMsNzEuMDQ1LTYxLjQzMzczLDcxLjA0NWwtMTEuNzgzNjYtMTMuMzczMzIsMjkuMTI1NTctMzAuMDAwMzFMOTk1LjY3Miw0NDkuMTA4NzNaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiM2YzYzZmYiLz48cGF0aCBpZD0iYjExNmQ2YjQtYTczNi00OTBjLTkyZjMtYzhmYWMwNjUzMWZmLTU1IiBkYXRhLW5hbWU9IlBhdGggMjk2MCIgZD0iTTE0Mi44NTk1MSw3NTYuMDI3NTRoOTE0LjI4MWExLjI0NywxLjI0NywwLDAsMCwwLTIuNDk0aC05MTQuMjgxYTEuMjQ3LDEuMjQ3LDAsMSwwLDAsMi40OTRaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTQxLjYxMjUgLTE0My45NzI0NikiIGZpbGw9IiNjY2MiLz48L3N2Zz4=', isHuman: true, seatPos: 'bottom', personality: 'human', personalityText: '', api: { useOwn: false, apiUrl: '', model: '', apiKey: '' } },
+  { id: 1, name: 'Gamer', avatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iNjQwIiBoZWlnaHQ9IjY0MCIgdmlld0JveD0iMCAwIDY0MCA2NDAiIHJvbGU9ImltZyIgYXJ0aXN0PSJLYXRlcmluYSBMaW1waXRzb3VuaSIgc291cmNlPSJodHRwczovL3VuZHJhdy5jby8iPjxkZWZzPjxjbGlwUGF0aCBpZD0iYS0xMzUiPjxjaXJjbGUgY3g9IjMyMCIgY3k9IjMyMCIgcj0iMzIwIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNzIzMiAtMjQyNzApIiBmaWxsPSJub25lIiBzdHJva2U9IiM3MDcwNzAiIHN0cm9rZS13aWR0aD0iMSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xMDk1IC0xOTEpIj48Y2lyY2xlIGN4PSIzMjAiIGN5PSIzMjAiIHI9IjMyMCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA5NSAxOTEpIiBmaWxsPSIjZjJmMmYyIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoODMyNyAyNDQ2MSkiIGNsaXAtcGF0aD0idXJsKCNhLTEzNSkiPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC05NS40MDkgLTEzNy4zODUpIj48cGF0aCBkPSJNNzc1LjkxNCw0MjMuM2MtMS45MDgsMi45MzktMS45MDgsNi42LTEuOTA4LDEwLjA1NywwLDE2Ljg4OS4xNzIsMzMuODczLDIuNjcyLDUwLjU4OS41OTIsNC4wMDcsMS4zMzYsOC4wMTUsMS43MTgsMTIuMDYxYTEzOS4xMzYsMTM5LjEzNiwwLDAsMSwuMjY3LDE2LjkyN2wtMS45MDgsNzMuNDdjLS4yMjksOC45ODgtLjY4NywxOC42NDQtNi4yNCwyNS43YTEyLjI4OSwxMi4yODksMCwwLDAtMi4yMzMsOC4xNDljMS40NSwxOC40MzQsNC41LDM2LjcxNiw3LjUzOCw1NC45NGEzMy45NDksMzMuOTQ5LDAsMCwxLDMwLjgsMS40NywzMzkuMDI2LDMzOS4wMjYsMCwwLDAsMTUuODItOTMuNTA4Yy40MzktMTUuNjI5LS4yMjktMzEuMzU0LDIuMTc1LTQ2Ljc5Miw0LjAyNy0yNS45OTEsMi4zODUtNTIuNjUtLjU3Mi03OC43OTQtLjkzNS04LjI4Mi0yLjkyLTE2LjgxMi04LjIyNS0yMy4yMjRhMzUuMjA5LDM1LjIwOSwwLDAsMC0xOS4wODMtMTAuOTkyQzc4OS42NzIsNDIxLjUwNiw3ODMuMzU2LDQyMy40MTQsNzc1LjkxNCw0MjMuM1oiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03NjkyLjY4OSAtMjQxNDIuNzEzKSIgZmlsbD0iIzZjNjNmZiIvPjxwYXRoIGQ9Ik04MDguMDY3LDM2NC41OTRsNS44MzksMjIuNzA5YTYwLjY4NCw2MC42ODQsMCwwLDEsMi42MTQsMTYuMDQ5LDExLjg1MiwxMS44NTIsMCwwLDEtMS4yNzksNS43MjUsMTMuNjQyLDEzLjY0MiwwLDAsMS0zLjYyNiwzLjdjLTMuOTg5LDMuMDM0LTYuNzU1LDEwLjExNC0xMS4zMTYsMTIuMjEzLDIuMzQ3LDQuMDg0LDUuNTkxLDEuNDMxLDkuODI4LDMuNDczLDcuNDYxLDMuNjI2LDE0LjI5Myw4LjgzNiwyMi4zODUsMTAuNjI5LDcuNjMzLDEuNjc5LDE1LjY0OC4xLDIzLjIyNC0xLjkwOCwxMC43NDQtMi45MiwyMS40My02Ljk0NiwzMC4wNzUtMTMuOTg4czEzLjU2OC0xMy4yNjMsMTMuNTMtMjQuMzg4Yy05LjU0MiwxLjEyNi0xOC4wMzQtOC41MTEtMjIuMjUxLTE3LjE3NWE0Ni42NjIsNDYuNjYyLDAsMCwxLTMuMjA2LTEwLjI4NmwtNS4xMTQtMjIuNWMtNS41NzIsMS4yMjEtMTAuMTE0LDUuMjEtMTUuNDM4LDcuMjlzLTExLjYyMiwyLjI3MS0xNy41MzcsMi41MzhhMTg4LjkxOCwxODguOTE4LDAsMCwwLTMxLjIyLDQuMDQ2Yy0xLjQxMi4yODYtMy4xODcsMS4xODMtMi44NDMsMi41NTciIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03NjYzLjU2NiAtMjQyMDkuNjUpIiBmaWxsPSIjZWQ5ZGEwIi8+PHBhdGggZD0iTTgwOC4wNjcsMzY0LjU5NGw1LjgzOSwyMi43MDlhNjAuNjg0LDYwLjY4NCwwLDAsMSwyLjYxNCwxNi4wNDksMTEuODUyLDExLjg1MiwwLDAsMS0xLjI3OSw1LjcyNSwxMy42NDIsMTMuNjQyLDAsMCwxLTMuNjI2LDMuN2MtMy45ODksMy4wMzQtNi43NTUsMTAuMTE0LTExLjMxNiwxMi4yMTMsMi4zNDcsNC4wODQsNS41OTEsMS40MzEsOS44MjgsMy40NzMsNy40NjEsMy42MjYsMTQuMjkzLDguODM2LDIyLjM4NSwxMC42MjksNy42MzMsMS42NzksMTUuNjQ4LjEsMjMuMjI0LTEuOTA4LDEwLjc0NC0yLjkyLDIxLjQzLTYuOTQ2LDMwLjA3NS0xMy45ODhzMTMuNTY4LTEzLjI2MywxMy41My0yNC4zODhjLTkuNTQyLDEuMTI2LTE4LjAzNC04LjUxMS0yMi4yNTEtMTcuMTc1YTQ2LjY2Miw0Ni42NjIsMCwwLDEtMy4yMDYtMTAuMjg2bC01LjExNC0yMi41Yy01LjU3MiwxLjIyMS0xMC4xMTQsNS4yMS0xNS40MzgsNy4yOXMtMTEuNjIyLDIuMjcxLTE3LjUzNywyLjUzOGExODguOTE4LDE4OC45MTgsMCwwLDAtMzEuMjIsNC4wNDZjLTEuNDEyLjI4Ni0zLjE4NywxLjE4My0yLjg0MywyLjU1NyIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTc2NjMuNTY2IC0yNDIwOS42NSkiIG9wYWNpdHk9IjAuMSIvPjxjaXJjbGUgY3g9IjUwLjUzMiIgY3k9IjUwLjUzMiIgcj0iNTAuNTMyIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNjg4MC45NTcgLTIzOTMzLjYwNSkiIGZpbGw9IiNlZDlkYTAiLz48cGF0aCBkPSJNODUyLjczMSwzOTcuOTA2YTQ1LjgsNDUuOCwwLDAsMSwxMS40NS0xNS4yNjZjNy4xMTgtNi4yNCwxNi44NS0xMS4zLDE4LjUzLTIwLjYxbDE1LjQxOSwxNy45NTdhOC4zLDguMywwLDAsMSwxLjkwOCwyLjkzOSw3LjQsNy40LDAsMCwxLTEuNDUsNS45MzVjLTMuODE3LDYuMDg4LTkuODI4LDEwLjQzOC0xNS41MTUsMTQuODQ3YTQ3MS4yMjksNDcxLjIyOSwwLDAsMC0zNy4zODQsMzIuOTc2LDMuODE3LDMuODE3LDAsMCwxLTIsMS4yMjEsMy42MDcsMy42MDcsMCwwLDEtMi4wOC0uNTkyLDg2LjgwOCw4Ni44MDgsMCwwLDEtMjYuNjU5LTIxLjY3OWMtLjU1My0uNjY4LTEuMjQtMS40MzEtMi4xMzctMS4zNzRhMi43NDksMi43NDksMCwwLDAtMS40MzEuNzQ0Yy01LjEzMyw0LjItMTAuNzQ0LDkuMjE3LTE3LjMyNyw4LjU2OCw4LjUzLTYuMTI2LDEzLjM1OC0xNi4zNTQsMTUuMTUyLTI2LjcxNmE1MC40ODYsNTAuNDg2LDAsMCwxLDIuMTc1LTEwLjQzOCwxMC45LDEwLjksMCwwLDEsNy40NDMtNy4wNjFjLTQuMTYsNi4zNTUtMS4zMTcsMTUuMzYyLDQuMjc1LDIwLjVhNDIuMTM0LDQyLjEzNCwwLDAsMCwxOC45Myw5LjE3OUM4NDguNTEzLDQxMC4yNTMsODUwLjQyMiw0MDIuOTA2LDg1Mi43MzEsMzk3LjkwNloiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03NjY5LjI0MyAtMjQxOTcuNjgpIiBmaWxsPSIjMzIzNDQ0Ii8+PHBhdGggZD0iTTgwMS42NTcsNTU0Ljg1YzcuMTk0LDEuNzc1LDE0LjAwNyw0Ljc5LDIwLjk5MSw3LjAyM2ExMDAuMzE5LDEwMC4zMTksMCwwLDAsMzkuNDA3LDQuMTQxYzQuMDg4LS4wOSw4LjI5MiwyLjI5LDExLjY4LDAsLjktLjcyNSw2Ljc2Mi42NjgsNy43MTYsMCwxLjYtLjk1OCwyOC4yOTUuNDQ2LDMwLjEsMCwxMC41LTMuMjg2LDEzLjAxNS04LjIwNywzOS4yLTExLjE2NCwxNi45ODUtMS45MTgsMzAuMDMxLTguOTIzLDM1LjcxOC0xMy41NDkuNDU4LS4zODIuOTczLS44NTkuOTM1LTEuNDY5YTEuOTA5LDEuOTA5LDAsMCwwLS41NzMtMS4wODhMOTIwLjU2NCw1MThjLTE5LjYxOCwzLjMzOS0zOS43MTIsMi4wOC01OS42MTYsMS41ODRhODYuNTczLDg2LjU3MywwLDAsMC0xMi4yNTEuMzI0Yy0zLjkzMS40NTgtNy44MDUsMS40NS0xMS42NzksMi4yOS0xNC43MTMsMy4yMDYtMjkuNzUxLDQuNDI3LTQ0LjY1NSw2LjUyNmE2Ljg5LDYuODksMCwwLDAtMi45NTguOTE2LDYuNjU4LDYuNjU4LDAsMCwwLTEuNTg0LDEuNzU1bC01LjIyOSw3LjM0N2EyMy4xMSwyMy4xMSwwLDAsMC00LjM4OSw4LjQxNWMtMS4yMjEsNS43MjUsMS4zMzYsNy42MzMsNi4yLDYuODg5QTQ1LjMsNDUuMywwLDAsMSw4MDEuNjU3LDU1NC44NVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03NjgzLjkxMSAtMjQwNTYuMDEpIiBmaWxsPSIjMzIzNDQ0Ii8+PHBhdGggZD0iTTg2Ni41OSw0MTkuMzE3YTkyLjk0Miw5Mi45NDIsMCwwLDAtMTkuNjc0LTE1LjM2MiwyNy44ODMsMjcuODgzLDAsMCwwLTkuNTQyLTMuODE3LDExLjkwOCwxMS45MDgsMCwwLDAtOS43NzEsMi40Yy0xLjcsMS41MDgtMi43NjcsMy42MDctNC40MDgsNS4xOTFhMjEuOTIzLDIxLjkyMywwLDAsMS02Ljk4NCwzLjk1LDEyMy44ODQsMTIzLjg4NCwwLDAsMC0yNC41NDEsMTMuOTg4LDU2LjMsNTYuMywwLDAsMC0xMS4xMjYsMTAuMjY3Yy04LjY0NSwxMS4wNjgtOS45NDIsMjYuMTI1LTkuNzEzLDQwLjE3LjE3Miw5Ljc3MSw5LjU0MiwxNy4wMjIsMTUuOTkyLDI0LjMzMWExNzkuMjYsMTc5LjI2LDAsMCwxLDE2LjM3MywyMi45YzMuNDczLDUuNSw3LjEsMTEuNDUsNi42NiwxOC0uMzYzLDUuMzYyLTMuNDkyLDEwLjQtMywxNS43NDQuMTcyLDEuOTA4Ljc4MiwzLjY2NC45NTQsNS41MTUuMzQ0LDMuODE3LTEuMTY0LDcuNjMzLTEuNTQ2LDExLjQ1LS41MTUsNS40LDEuMjQsMTAuNzYzLDEuMzM2LDE2LjJhNTEuNTI0LDUxLjUyNCwwLDAsMS0xLjQxMiwxMS4wNDljLTMuNjY0LDE3LjQ0Mi04LjI2MywzNC45NzktNy4zMjgsNTIuNzg0bC0xMC41NzIsMS45MDhhOC45MzEsOC45MzEsMCwwLDEtMi4wNDIsMTQuMjU1YzE2LjUwNyw1LjUxNSwzNC4zNSwyLjcyOSw1MS44NDksMi43MSwxNC40ODQsMCwyOC45MTEsMS45MDgsNDMuMzc2LDEuNjQxczI5LjM4OC0yLjg4Miw0MS4zMTUtMTEuMDY4YzMuMjQ0LTIuMjE0LDYuMjIxLTQuODA5LDkuNjM3LTYuNzM2YTQ3LjUzMyw0Ny41MzMsMCwwLDEsMTQuNi00Ljc3MSwxNDQuODU1LDE0NC44NTUsMCwwLDEsMjguNjI1LTIuNTU3YzQuNjk1LDAsOS44MDkuMTkxLDEzLjU0OS0yLjYzNCw0LjEyMi0zLjEzLDUuMTcyLTguOCw1LjcyNS0xMy45MzEuNTUzLTUuNDIuOS0xMC44NTguOTkyLTE2LjNhNzAuMjc4LDcwLjI3OCwwLDAsMC0uNjY4LTEyLjY3MSw4My4wMSw4My4wMSwwLDAsMC0yLjIzMi05LjA4NEw5ODUuODIyLDU2OS41Yy0yLjk3Ny0xMC40NTgsMS4xNjQtMjEuOTI3LDIuMDQyLTMyLjc2Ni4yMS0yLjU1Ny4yNDgtNS41MzQtMS43MTgtNy4xNzUtLjcwNi0uNTkyLTEuNjc5LS45OTItMS45MDgtMS45MDhhMy4yNjMsMy4yNjMsMCwwLDEsLjQ1OC0yLjU1N2MzLjgxNy03LjYzMyw5LjU0Mi0xNC4zNywxNC43Ny0yMS4yNTlhNDM0LjUxMiw0MzQuNTEyLDAsMCwwLDI0LjQyNi0zNy41MzcsMTIwLjc3OCwxMjAuNzc4LDAsMCwwLTMyLjMyNy03Mi4yODcsMzQuOTc4LDM0Ljk3OCwwLDAsMC0xMy41My05Ljk4LDQwLjA3Myw0MC4wNzMsMCwwLDAtMTAuNzYzLTEuNzM3Yy0xNC45NjEtMS4wMTEtMzAuNTMzLTEuOTA4LTQzLjU2Ny05LjQyN2E4LjI4NCw4LjI4NCwwLDAsMC0zLjExMS0xLjMxN2MtMi44ODItLjMyNS00Ljk4MSwyLjUxOS02Ljg1MSw0Ljc3MS00LjgwOSw1LjcyNS0xMS44ODksOS4wMDctMTguMTEsMTMuMjI1Qzg4NC4wMzMsMzk3LjQyOSw4NzQuOTY4LDQwOC4yNjgsODY2LjU5LDQxOS4zMTdaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNzY5MC4zNTUgLTI0MTg5LjA1NSkiIGZpbGw9IiM2YzYzZmYiLz48cGF0aCBkPSJNOTM5LjUzNCw0MzUuNjM1YzIuOTc3LDkuNDI3LDIuNjkxLDE5LjUsMy42NjQsMjkuMzMxYTExNC4xMzIsMTE0LjEzMiwwLDAsMCwzLjExMSwxNy41NzYsMjguMDQ1LDI4LjA0NSwwLDAsMCwzLjYyNiw4Ljk1YzEuNzE3LDIuNTE5LDQuMTc5LDQuNTYxLDUuMjY3LDcuNGExNy44ODEsMTcuODgxLDAsMCwxLC43ODIsNS45NTRsLjIyOSwxMy4xNjdhNDcuMzUxLDQ3LjM1MSwwLDAsMS0zLjExMSwyMC41bC04LjIyNSwyNS4wMThjLTQuNDQ2LDEzLjU0OS05LjAwNywyNy4zMDgtMTcuMDIyLDM5LjFhMTEuMjc4LDExLjI3OCwwLDAsMS00LjksNC42LDIzLjgzNSwyMy44MzUsMCwwLDEtNC45NDMuNzYzLDEyLjcwOSwxMi43MDksMCwwLDAtMTAuNDc3LDEyLjM0NywyOC45OTEsMjguOTkxLDAsMCwwLTcuMDQyLTcuMTk0bC0xNi43MzYtMTMuMzU4Yy01LjcyNS00LjY1Ni0xMS43LTkuMzg5LTE4LjY0NC0xMi4wOGE1MC41NTEsNTAuNTUxLDAsMCwwLDM1LjE1MS00Mi40NzksMTkuMDg0LDE5LjA4NCwwLDAsMSwxLjkwOC04LjM1OGMxLjM5My0yLjI1MiwzLjk2OS0zLjk2OSw0LjE2LTYuNjIyLjIyOS0zLjM0LTMuNTQ5LTUuODU5LTMuNTQ5LTkuMiwwLTIuMjE0LDEuNjQxLTQuMDQ2LDIuMzY2LTYuMTI2YTE1LjM4MiwxNS4zODIsMCwwLDAsMC03Ljg0M2wtMi4zMDktMTIuODI0YTkuNzkyLDkuNzkyLDAsMCwwLTEuMTQ1LTMuNjY0LDIzLjY5MywyMy42OTMsMCwwLDAtMi44NjItMy4wMTVjLTMuOTY5LTQuNDQ2LTIuMjE0LTExLjQ1LDAtMTYuOTI3YTE2MS43ODgsMTYxLjc4OCwwLDAsMSwxOS41LTM0LjIxNkExMTcsMTE3LDAsMCwwLDkyNi4xLDQyNS4zM2MyLjAyMy0zLjUxMSwyLjQ4MS04LjM3OCw0LjYxOC0xMS40NUM5MzMuNDY2LDQyMS4wOTMsOTM3LjE4Nyw0MjguMjExLDkzOS41MzQsNDM1LjYzNVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03NjA0LjY5OCAtMjQxNTAuNTg0KSIgZmlsbD0iIzZjNjNmZiIvPjxwYXRoIGQ9Ik04NjkuOTUsNTA2LjIxMmE5LjIsOS4yLDAsMCwwLTIuMTc2LDIuMjksMTkuMjk0LDE5LjI5NCwwLDAsMS04LjY0NSw2LjE2NGMxLjkwOCwxLjM3NCwzLjY0NSwyLjcyOSw1LjQzOSw0LjEyMmEyMzguMzIxLDIzOC4zMjEsMCwwLDEsMzYuMjU4LDM0LjY3NGMxLjItNC4yOTQsOC40LTMuOTg4LDEwLjE1Mi04LjA5MWE3LjkyNCw3LjkyNCwwLDAsMCwuMzgyLTMuNjY0LDExMS43NjQsMTExLjc2NCwwLDAsMC0yLjc0OC0xOS4wODMsMjEuNiwyMS42LDAsMCwwLTMuODE3LTguOTMxYy0yLjY3Mi0zLjIyNS02LjgzMi00Ljc3MS0xMC44LTYuMTA3Qzg4Ny45ODQsNTA1LjQ4Nyw4NzYuMDU3LDUwMi41MjksODY5Ljk1LDUwNi4yMTJaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNzYxMC4xMyAtMjQwNjguMzA1KSIgZmlsbD0iIzMyMzQ0NCIvPjxwYXRoIGQ9Ik04NjYuOTg3LDUxNi4xNDVjLTUuNzI1LDQuMjM2LTEwLjc0NCw5LjU0Mi0xNy4xNzUsMTIuNDQyLTQuNTQyLDIuMDYxLTkuNzEzLDIuOTU4LTEzLjY4Miw2LjAzLDIuMTU2LDQuNzUyLDcuNzY3LDcuMjE0LDEyLjk3Niw3LjAyM2EzMC44NCwzMC44NCwwLDAsMCwxNC41MjItNS4zMjRjMy40MTYtMi4xLDcuNDIzLTQuNTQyLDExLjE0NS0zLjA3Mi41NzMsMi45LTEuOTA4LDUuNjMtMS45MDgsOC41NjhzMi40NDMsNS4wNzYsNC44NDcsNi42MjJjMTEuNDUsNy4zODUsMjYuMTgyLDYuNzc0LDM5LjgyNiw1LjkxNmEzLjU4OCwzLjU4OCwwLDAsMCwyLjE5NS0uNjQ5LDMuNDU1LDMuNDU1LDAsMCwwLC44Mi0yLjUxOWMuMTcyLTMuMDE1LjI0OC02LjAxMS4yNjctOS4wMjZhMTIuOTM5LDEyLjkzOSwwLDAsMC01LjUzNC0xMi43NDgsMTU1Ljc2MiwxNTUuNzYyLDAsMCwwLTIzLjg1NC0xNi44ODhDODgzLjAzNiw1MDcuNjUzLDg3NC41MjUsNTEwLjUzNSw4NjYuOTg3LDUxNi4xNDVaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNzYzMS4wMjEgLTI0MDYzLjIzOCkiIGZpbGw9IiNlZDlkYTAiLz48cGF0aCBkPSJNODMzLjQwNiwzMjYuMTcyYy04LjQ3MywxLjAxMS0xNC42MzcsNy42MzMtMTMuNzc4LDE0LjgyOHM4LjQxNiwxMi4xNTYsMTYuODg5LDExLjEyNSwxNC42MzctNy42MzMsMTMuNzc4LTE0LjgwOVM4NDEuODc5LDMyNS4xNjEsODMzLjQwNiwzMjYuMTcyWm0yLjg4MiwyMy45NjhjLTcuMTc1Ljg1OS0xMy41NjgtMy4zNTktMTQuMzEyLTkuNDI3czQuNS0xMS42NzksMTEuNjYtMTIuNTM4LDEzLjU2OCwzLjM1OSwxNC4zMTIsOS40MjdTODQzLjQ0NCwzNDkuMjgyLDgzNi4yODgsMzUwLjE0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTc2NDYuMDgzIC0yNDIzMC4zNjkpIiBmaWxsPSIjM2MzNTRjIi8+PHBhdGggZD0iTTgxMS43NjYsMzI4Ljc3MmMtOC40NzMsMS4wMTEtMTQuNjM3LDcuNjMzLTEzLjc3OCwxNC44MDlzOC40MTYsMTIuMTU2LDE2Ljg4OSwxMS4xNDUsMTQuNjM3LTcuNjMzLDEzLjc3OC0xNC44MjhTODIwLjIzOSwzMjcuNzYxLDgxMS43NjYsMzI4Ljc3MlptMi44ODIsMjMuOTQ5Yy03LjE3NS44NTktMTMuNTY4LTMuMzU5LTE0LjI5My05LjQwOHM0LjQ4NC0xMS42NzksMTEuNjYtMTIuNTU3LDEzLjU2OCwzLjM1OSwxNC4yOTMsOS40MjctNC41LDExLjY3OS0xMS42NiwxMi41MzhaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNzY2NS43MzkgLTI0MjI4LjAwOCkiIGZpbGw9IiMzYzM1NGMiLz48cGF0aCBkPSJNNjYzLjY0MywyNTkuNjRsMTguNDE1LDMuOTMxLTEuODEzLDQuODQ3LTE3LjM2Ni01LjFaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNzU0OC4yODMgLTI0MTU1LjE5MSkiIGZpbGw9IiMzYzM1NGMiLz48cGF0aCBkPSJNNzI1LjE1NCwyNTMuMThsLTE2Ljk4NCw4LjE4NywyLjkyLDQuMjc1LDE1LjY2Ny05LjA2NVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03NTA3LjE0NiAtMjQxNjEuMDU5KSIgZmlsbD0iIzNjMzU0YyIvPjxwYXRoIGQ9Ik02ODcuMzEsMjYxLjhsMTIuOTE5LTEuNTQ2LS42NjgsMy4yMDYtMTEuMDg3Ljc0NFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03NTI2LjA5MyAtMjQxNTQuNjM5KSIgZmlsbD0iIzNjMzU0YyIvPjxwYXRoIGQ9Ik04MTQuOTMyLDM2MC44MjZhMjAuNDk0LDIwLjQ5NCwwLDAsMCwxLjkwOC04LjMzOSwxNy44MywxNy44MywwLDAsMSwuODc4LTUuMDc2LDE0LjIsMTQuMiwwLDAsMSw0LjE2LTUuMzI0YzUuOTU0LTUuMDM4LDE0LjQ4NC03LjYzMywyMi45LThhNTIuOTM4LDUyLjkzOCwwLDAsMSwyNi40ODcsNS43MjUsMjAuNjA5LDIwLjYwOSwwLDAsMSw2LjU4NCw0Ljg4NWMyLjY3MiwzLjI2MywzLjI0NCw3LjQ4MSw1LjkzNSwxMC43MDZhMTUuNTkxLDE1LjU5MSwwLDAsMCwxNC42MTgsNC41OGMuOTM1LTMuMzItLjI4Ni02LjgzMi4xOTEtMTAuMjI5YTQ5LjQ4Myw0OS40ODMsMCwwLDEsMy4wMzQtOC40NzNjMi45NTgtOC43MjEtMS4zNTUtMTguODM1LTEwLjI0OC0yNC4wNDUtMy4xMTEtMS45MDgtNi43OTQtMy4xNDktOS4xMjItNS43MjVzLTIuODgyLTUuMjQ4LTQuNDg0LTcuODI0Yy00LjI1NS02LjgxMy0xNS4yNjYtMTAtMjMuNjQ0LTYuODUxLTIuNjM0Ljk5Mi00Ljk2MiwyLjUtNy42MzMsMy41NjktNC45NjIsMi4wNDItMTAuNjEsMi40LTE2LjA2OCwzLjA5MWE0OS4yMTQsNDkuMjE0LDAsMCwwLTE1LjU3Miw0LjA4NGMtNC43MTQsMi4zMjgtOC42NjQsNi4wNjgtOS43NTEsMTAuNTM0LS41MTUsMi4wNjEtLjQsNC4yLS45MTYsNi4yNC0yLjYzNCwxMC4zNjItMTkuNjM3LDE1LjQtMjAuNTkxLDI1Ljk3Mi0uMzQ0LDMuODE3LDEuNzM2LDcuNDgxLDQuMzMyLDEwLjU5MSwxLjc5NCwyLjExOCw2LjA4OCw3Ljc4Niw5LjEyMiw4LjYwN3M1LjM0My0yLjA2MSw4LjI0NC0zLjA1M0M4MDkuODc1LDM2NS4wNDMsODEyLjY0MiwzNjQuNzM4LDgxNC45MzIsMzYwLjgyNloiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03Njc4Ljc3MSAtMjQyNTgpIiBmaWxsPSIjZDZkNmUzIi8+PC9nPjwvZz48L2c+PC9zdmc+', isHuman: false, seatPos: 'left', personality: 'aggressive', personalityText: PERSONA_DEFAULTS.aggressive, api: { useOwn: false, apiUrl: '', model: '', apiKey: '' } },
+  { id: 2, name: 'Professor', avatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iNjQwIiBoZWlnaHQ9IjY0MCIgdmlld0JveD0iMCAwIDY0MCA2NDAiIHJvbGU9ImltZyIgYXJ0aXN0PSJLYXRlcmluYSBMaW1waXRzb3VuaSIgc291cmNlPSJodHRwczovL3VuZHJhdy5jby8iPjxkZWZzPjxjbGlwUGF0aCBpZD0iYS0xMzciPjxjaXJjbGUgY3g9IjMyMCIgY3k9IjMyMCIgcj0iMzIwIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTczNTUgLTYzMzkpIiBmaWxsPSJub25lIiBzdHJva2U9IiM3MDcwNzAiIHN0cm9rZS13aWR0aD0iMSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC02OTQgLTExMCkiPjxjaXJjbGUgY3g9IjMyMCIgY3k9IjMyMCIgcj0iMzIwIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2OTQgMTEwKSIgZmlsbD0iI2YyZjJmMiIvPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE4MDQ5IDY0NDkpIiBjbGlwLXBhdGg9InVybCgjYS0xMzcpIj48cGF0aCBkPSJNNjk3LjAxOCw2OC40NDNzLTMwLjI2Ni0yNy4xMzYtNzAuOTcsMjQtMTA0LjM2NCw3Ni4xODgtMTE4Ljk4LDk2LjAxOGMwLDAsNjAuNTM0LTI1LjA0OSw4MS40MDgtMzUuNDg1czE5LjgzMi04LjM0OSwxOS44MzItOC4zNDktMjguMTgsMTkuODMyLTMzLjQsMzkuNjYzLTEuMDQ0LDM2LjUyOS0xMC40MzYsNTYuMzU5LDE3OS41MTMsMTMuNTY3LDE3OS41MTMsMTMuNTY3LDE4Ljc4Ny0zMi4zNSwxMy41NjctNjUuNzUyUzc1NS40NjQsNzIuNjE3LDY5Ny4wMTgsNjguNDQzWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE3Njc4Ljk0MSAtNjI0OC44MzMpIiBmaWxsPSIjMDkwODE0Ii8+PHBhdGggZD0iTTYyNS45NzEsMTM5LjgzczYuNTgyLDQ2LjA3LTIxLjYyNSw1Ni40MTItMTcuODY1LDI0LjQ0NS0xNy44NjUsMjQuNDQ1bDQyLjMxLDIwLjY4NCw0NS4xMzEtMTQuMUw2ODguOTY1LDIwNC43UzY2NC41MiwxOTkuMDYzLDY3MS4xLDE4Mi4xNHM4LjQ2Mi0yMi41NjUsOC40NjItMjIuNTY1WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE3NjY1LjE0MSAtNjIzNC44NTMpIiBmaWxsPSIjZmZiOWI5Ii8+PHBhdGggZD0iTTcyNi4xMjQsMjUxLjU3OHMtNi41ODIsODYuNS00LjcsOTAuMjYsMCwxMzQuNDUsMCwxMzQuNDUsMTMuMTYzLDcwLjUxNS0zLjc2MSw3NC4yNzdTNzA0LjUsNDcxLjU4Nyw3MDQuNSw0NzEuNTg3TDY4Ny41NzUsMzYyLjUyM2wxLjg4LTEwOC4xMjRaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTc2NDYuODI4IC02MjE0Ljk3MikiIGZpbGw9IiNmZmI5YjkiLz48ZWxsaXBzZSBjeD0iNDEuNzg2IiBjeT0iNDEuNzg2IiByeD0iNDEuNzg2IiByeT0iNDEuNzg2IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTcwNDMuMzQ4IC02MTQ2LjIxMikiIGZpbGw9IiNmZmI5YjkiLz48cGF0aCBkPSJNNTg0LjYwNywxOTQuNzYzbDEyLjQyLTQuMzM4cy00LjksOC4xLDIxLjQyOCwxMi44LDUzLjU4OSw2LjM2Niw2NS44MTYtOS4wMzljMCwwLDQuNy0yLjI0MiwxMS4yNzksNC4zMzhzMTAuMzQyLDQuNywxMC4zNDIsNC43bC00LjcsMjQuNDQ1LTkuNCw0NS4xMzEtMTIuMjIzLDMzLjg0OC0zNC43ODctNy41MjFMNjA3LjE3LDI3MS44NTZsLTE0LjEtMzYuNjY5VjIwMS4zNDVaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTc2NjUuMTQ1IC02MjI1Ljg1MykiIGZpbGw9IiM2YzYzZmYiLz48cGF0aCBkPSJNNzA2LjQxMiwyMDcuNGw5LjQtNi41ODJzMzEuOTY3LDUuNjQxLDMzLjg0OCwyMC42ODRsLTI0LjQ0Niw0Ny4wMTNhNTMuNTIxLDUzLjUyMSwwLDAsMS0uOTQxLDQwLjQyOWMtOS40LDIxLjYyNS04LjQ2MiwyNi4zMjYtOC40NjIsMjYuMzI2bC02LjU4MiwyOC4yMDctMTE5LjQwNiw5LjRzLTQuNy0xMS4yNzktNi41ODItMTMuMTYzLTEuODgtOC40NjIsMC04LjQ2MiwwLTIuODIxLTEuODgtNS42NDEtMi44MjEtMy43NjEsMC03LjUyMS00LjctMzcuNjA4LTQuNy0zNy42MDhWMjYzLjgwOUw1NDQuNywyMjEuNXMxMS4yNzktMTYuOTI0LDE2LjkyNC0xOC44LDMyLjQ3NC05LjMsMzIuNDc0LTkuM2w2LjA3Myw4Ljk0LDguNDYyLDY4LjA0NywxMi4yMjIsNDEuMzY5LDUxLjQ2NC04Ljc0NCwxOS45OTItMzMuNTY1LDEzLjE2My0zOS40ODhaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTc2NzIuMjQ2IC02MjI1LjMyMykiIGZpbGw9IiM2YzYzZmYiLz48cGF0aCBkPSJNNzE1Ljg3NCwyMTIuNDY2bDcuNTIxLDUuNjQxczYuNTgyLDUyLjY1Miw0LjcsNTYuNDEyLTM0Ljc4Nyw3LjUyMS0zNS43MjgsNS42NDFTNzE1Ljg3NCwyMTIuNDY2LDcxNS44NzQsMjEyLjQ2NloiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNzY0NS45OCAtNjIyMS45MykiIGZpbGw9IiM2YzYzZmYiLz48cGF0aCBkPSJNNTg0LjQ1MiwxOTAuNjg0bDkuNCw2Mi4wNTNzLTguNDYyLDkyLjE0LTYuNTgyLDExMC45NDRsMS44OCw1LjY0MXMtMy43NjEtMS44OC00LjcsMS44OCwwLDE1Ljk4OSwwLDE1Ljk4OS01LjY0MSw1LjY0MS03LjUyMSwzNi42NjktMjQuNDQ1LDEwNS4zLTE1Ljk4OSwxMDguMTI0LDU5LjIzMywxNi45MjQsODYuNSwxNC4xLDEyNS4wNTMtMzUuNzMzLDEyNC4xMTYtNDQuMTk1LTQ3Ljk1LTEyNy44NjgtNDcuOTUtMTI3Ljg2OC04LjQ2Mi0xNC4xLTguNDYyLTE1Ljk4OSwxMS4yNzktOS40LDguNDYyLTE2LjkyNC0xNy44NjYtODYuNDk0LTE3Ljg2Ni04Ni40OTRsMTAuMzQyLTU2LjQxMi0xNC4xLTMuNzYxLTEwLjM0Miw1NC41MzdzLTQwLjQyOSwxOS43NDUtODIuNzM5LDEuODhsLTkuNC02My45MzVaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTc2NjkuNjkxIC02MjI2LjQ3NSkiIGZpbGw9IiMwOTA4MTQiLz48cGF0aCBkPSJNNjE5LjAyLDEwOS4yMzNzNjkuNTc2LDQ3Ljk1LDg4LjM3NSwyNi4zMjUtMzIuOTA3LTQwLjQyOS0zMi45MDctNDAuNDI5bC00My4yNDktNC43WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE3NjU5LjAyMyAtNjI0My42NDIpIiBmaWxsPSIjMDkwODE0Ii8+PHBhdGggZD0iTTUzOS4xMzQsMjYxLjE1N3M2LjU4Miw4Ni41LDQuNyw5MC4yNiwwLDEzNC40NSwwLDEzNC40NS0xMy4xNjMsNzAuNTE1LDMuNzYxLDc0LjI3NywxMy4xNjMtNzguOTc3LDEzLjE2My03OC45NzdMNTc3LjY4MiwzNzIuMSw1NzUuOCwyNjMuOTc3WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE3NjczLjI2NiAtNjIxMy4yNjgpIiBmaWxsPSIjZmZiOWI5Ii8+PHBhdGggZD0iTTU1My44NzUsMjE0Ljg2MWwtNy41MjEsMi44MjFzLTE0LjEsNTkuMjMzLTEwLjM0Miw1OS4yMzMsNDguODkxLDUuNjQxLDQ4Ljg5MSwzLjc2MS04LjQ2Mi00Ny45NS04LjQ2Mi00Ny45NVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNzY3My45MDYgLTYyMjEuNTA1KSIgZmlsbD0iIzZjNjNmZiIvPjwvZz48L2c+PC9zdmc+', isHuman: false, seatPos: 'top', personality: 'analytical', personalityText: PERSONA_DEFAULTS.analytical, api: { useOwn: false, apiUrl: '', model: '', apiKey: '' } },
+  { id: 3, name: 'Cool Girl', avatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iNjQwIiBoZWlnaHQ9IjY0MCIgdmlld0JveD0iMCAwIDY0MCA2NDAiIHJvbGU9ImltZyIgYXJ0aXN0PSJLYXRlcmluYSBMaW1waXRzb3VuaSIgc291cmNlPSJodHRwczovL3VuZHJhdy5jby8iPjxkZWZzPjxjbGlwUGF0aCBpZD0iYS0xMzkiPjxjaXJjbGUgY3g9IjMyMCIgY3k9IjMyMCIgcj0iMzIwIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMTQxIDI1KSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzA3MDcwIiBzdHJva2Utd2lkdGg9IjEiLz48L2NsaXBQYXRoPjwvZGVmcz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtOTYgLTMyNSkiPjxjaXJjbGUgY3g9IjMyMCIgY3k9IjMyMCIgcj0iMzIwIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg5NiAzMjUpIiBmaWxsPSIjZjJmMmYyIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTEwNDUgMzAwKSIgY2xpcC1wYXRoPSJ1cmwoI2EtMTM5KSI+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoOTMzIDE3MCkiPjxwYXRoIGQ9Ik02MjYuNDIzLDE0Ni40MThhOTUuMjc0LDk1LjI3NCwwLDEsMC0xMjcuOTE0LDg1LjA1OWwxMi43MzQsMTIyLjQ0Niw5Ny40MzItNzMuNzlzLTE5LjA1OS0yNi43NTItMjguNTctNTYuMzU5YTk1LjE3LDk1LjE3LDAsMCwwLDQ2LjMxOC03Ny4zNTZaIiBmaWxsPSIjOWY2MTZhIi8+PHBhdGggZD0iTTUwMCwyNDlzLTU5Ljc4OC0yLjA3OS03OC43NTUsMjIuNTU3UzM5MCwzMzgsMzkxLDM2OXM3NC4yNzksMTk0LjE5Myw3NC4yNzksMTk0LjE5M2wyNjksNDgsMTUuOTE3Ljc3YTQ3LjkwNyw0Ny45MDcsMCwwLDAsNTAuMDQ2LTQzLjczN2gwYTM0NC4zODksMzQ0LjM4OSwwLDAsMC0xOC42NzYtMTQ1LjAxMUM3NjEuMzcxLDM2Ni40NSw3MzIuMywyOTUuMDksNzA4LDI3NmMtNDItMzMtMTIwLTMxLTEyMC0zMWwuMi4xNTlMNTQwLDMxM2wtNDAtNjRaIiBmaWxsPSIjNmM2M2ZmIi8+PHBhdGggZD0iTTMzMi43NzksNDYwLjY2NGwtNTAuNSwxOS41MjlzMzUuMjc5LDc4LjE5Myw3Myw4N2wzNi45NjctNTMuMjY1LTU5LjQ2Ny01My4yNjVaIiBmaWxsPSIjNmM2M2ZmIi8+PHBhdGggZD0iTTUxOC44NzksOTIuMDQ5cy0xOS44NTUsMjEuNTgyLTQyLjMsMjMuMzA4LTI3LjkyLDAtMjcuOTIsMC0yMS4yODYsMTEuMjIyLTUuNzQ3LDIzLjMwOGw0LjMxNiw3Ljc2OXMtMy4wNzYsNS4xOC02LjI4NiwwbC4yNDMsNy43NjlzLTE2LjQtNi45MDYtMTYuNC0xOC45OTJjMCwwLTE3LjA3Niw4LjYzMy0yMy42NDUtMTIuMDg2LDAsMCwxMy40Nyw4LjYzMywxMy44MSwwLDAsMC0yMi45NjgtMTMuODEyLTE3Ljc4OS0zNC41MzEsMCwwLC44NjMsNy43NjksNS4xOCw4LjYzMywwLDAtMTMuODEyLTI5LjM1MSw1LjE4LTQyLjNsMi41OSwxMC4zNTlzMC0xOC45OTIsMTguOTkyLTI1LjljMCwwLTIuNTksOC42MzMuODYzLDEyLjA4NiwwLDAsNS4xOC0yMy4zMDgsMTQuNjc1LTIyLjQ0NSwwLDAtNS4xOCwxMC4zNTksMS43MjcsMTAuMzU5czE2LjQtMjUuOSwxNi40LTI1LjksMTMuODEyLTcuNzY5LDE4Ljk5Mi02LjkwNmMwLDAtMTcuMjY1LDEwLjM1OS02LjkwNiwxMC4zNTlhMTkuNDIzLDE5LjQyMywwLDAsMCwxNS41MzktNy43NjlTNTA3LjY1Ni01LjUsNTI3LjUxMSwyLjI2OXMxNy4yNjUsNy43NjksMTcuMjY1LDcuNzY5UzU2MS4xNzktMy43NzQsNTc0LjEyOCw0bC00LjMxNiw1LjE4czQyLjMsOS41LDQyLjMsMjkuMzUxYzAsMCwyMC4yLDE2LjQ2MSwxNC40MTYsMzIuODM0LDAsMCw5Ljc1NSw2LjAxMyw4LjAyOSwxMy43ODMsMCwwLDEyLjk0OSw1OC43LTEuNzI3LDc4LjU1N2wtMTIuMDg2LDEzLjgxMnMtMTguMTI5LTUwLjkzMy0yNS45LTMwLjIxNC0yMi40NDUtNS4xOC0yMi40NDUtNS4xOC0xOS44NTUtMTQuNjc1LTIxLjU4Mi0zNS4zOTQtMzEuOTQxLTE0LjY3NS0zMS45NDEtMTQuNjc1WiIgZmlsbD0iIzA5MDgxNCIvPjxwYXRoIGQ9Ik00MzQsMzAybC0xOS0xNkwzNzUsNDI4bC05Mi43MjEsNTIuMTkzczExNC02LDczLDg3TDQ2OCw1NDdsLTEwLjcyMS04NC44MDdaIiBmaWxsPSIjNmM2M2ZmIi8+PHBhdGggZD0iTTc0OC43NzksNjExLjY2NGgwQzc1NC4yNDgsNjA0LjQ3Miw2MDkuODQzLDU5OC42NzEsNjA2LDU5MmMtMjAuNzUyLTM2LjAyMS0xMC02NC0xMC02NGwxNjktNDAtNzUuMjIxLTc4LjMwNyw2MS42NjUsNDYuODQ0QTEyNC45OSwxMjQuOTksMCwwLDEsODAwLjM2NCw1NjYuOGgwQTQ5LjE1NCw0OS4xNTQsMCwwLDEsNzQ4Ljc3OSw2MTEuNjY0WiIgZmlsbD0iIzZjNjNmZiIvPjwvZz48L2c+PC9nPjwvc3ZnPg==', isHuman: false, seatPos: 'right', personality: 'timid', personalityText: PERSONA_DEFAULTS.timid, api: { useOwn: false, apiUrl: '', model: '', apiKey: '' } }
+];
+
+// 持久化的玩家覆盖（姓名/性格/独立API），跨重开保留
+let playerOverrides = {};
+
+// ==================== 初始化 ====================
+function initGame() {
+  gameState.players = PLAYER_CONFIGS.map(cfg => ({
+    ...cfg,
+    personalityText: cfg.personalityText,
+    api: JSON.parse(JSON.stringify(cfg.api)),
+    hp: MAX_HP,
+    alive: true,
+    hand: [],
+    currentBullet: 0,
+    bulletsFired: 0,
+    trustLevels: {},
+    lastLied: false,
+    caughtLying: false,
+    difficulty: cfg.id === 1 ? 'medium' : cfg.id === 2 ? 'hard' : 'easy'
+  }));
+  // 应用持久化覆盖（用户自定义的名字/性格/独立API）
+  Object.keys(playerOverrides).forEach(id => {
+    const o = playerOverrides[id];
+    const p = gameState.players.find(x => x.id === Number(id));
+    if (!p) return;
+    if (o.name) p.name = o.name;
+    if (typeof o.personalityText === 'string') p.personalityText = o.personalityText;
+    if (o.api) p.api = o.api;
+  });
+  gameState.players.forEach(p => {
+    gameState.players.forEach(o => { if (o.id !== p.id) p.trustLevels[o.name] = 50; });
+  });
+  gameState.deck = [];
+  gameState.targetCard = null;
+  gameState.currentPlayerIdx = Math.floor(Math.random() * MAX_PLAYERS);
+  gameState.lastPlayerIdx = -1;
+  gameState.lastPlayedCards = [];
+  gameState.challengeCount = 0;
+  gameState.lieExposedCount = 0;
+  gameState.roundCount = 0;
+  gameState.gameStarted = false;
+  gameState.gameOver = false;
+  gameState.awaitingChallenge = false;
+  gameState.forcedChallenge = false;
+  gameState.humanPlayedThisTurn = false;
+  gameState.selectedCards = [];
+  gameState.tension = 0;
+  renderSeats();
+  renderHand();
+  renderActions();
+  renderTension();
+}
+
+// ==================== 牌组 ====================
+function createDeck() {
+  const deck = [...Array(6).fill('Q'), ...Array(6).fill('K'), ...Array(6).fill('A'), ...Array(2).fill('Joker')];
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function dealCards() {
+  gameState.deck = createDeck();
+  gameState.players.forEach(p => {
+    p.hand = [];
+    if (!p.alive) return;
+    for (let i = 0; i < CARDS_PER_HAND; i++) {
+      if (gameState.deck.length > 0) p.hand.push(gameState.deck.pop());
+    }
+  });
+}
+
+// ==================== 游戏流程 ====================
+function showModeModal() {
+  document.getElementById('modeModal').classList.add('show');
+}
+function hideModeModal() {
+  document.getElementById('modeModal').classList.remove('show');
+}
+
+function startGame(mode) {
+  gameState.gameMode = mode;
+  hideModeModal();
+  initGame();
+  gameState.gameStarted = true;
+  gameState.roundCount = 1;
+  addLog('🎴 游戏开始！模式：' + (mode === 'builtin' ? '内置AI' : 'AI模型'), 'sys');
+  dealCards();
+  gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
+  addLog('🎯 目标牌：' + gameState.targetCard, 'sys');
+  renderSeats();
+  const dealMs = renderHand(true);
+  renderTarget();
+  renderActions();
+  renderTension();
+  updateDisplay();
+  // 等发牌铺开动画（约3s）播完，再开始玩家/AI 的思考与行动流程
+  setTimeout(() => nextTurn(), dealMs + 200);
+}
+
+function startRound() {
+  if (gameState.gameOver) return;
+  gameState.roundCount++;
+  gameState.lastPlayedCards = [];
+  gameState.lastPlayerIdx = -1;
+  gameState.humanPlayedThisTurn = false;
+  gameState.awaitingChallenge = false;
+  gameState.forcedChallenge = false;
+  gameState.selectedCards = [];
+  // 每轮重新洗牌、发牌、指定目标牌（官方规则：每轮重新发牌）
+  dealCards();
+  gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
+  addLog('🎴 第' + gameState.roundCount + '轮开始！目标牌：' + gameState.targetCard, 'sys');
+  renderPlayedCards();
+  const dealMs = renderHand(true);
+  renderTarget();
+  renderSeats();
+  updateDisplay();
+  // 等重发牌铺开动画（约3s）播完，再开始下一轮思考与行动流程
+  setTimeout(() => nextTurn(), dealMs + 200);
+}
+
+function nextTurn() {
+  if (gameState.gameOver) return;
+  gameState.humanPlayedThisTurn = false;
+  const alivePlayers = gameState.players.filter(p => p.alive);
+  if (alivePlayers.length <= 1) { endGame(alivePlayers[0]); return; }
+
+  let current = gameState.players[gameState.currentPlayerIdx];
+  if (!current.alive || current.hand.length === 0) {
+    const nextIdx = getNextAliveIndex(gameState.currentPlayerIdx, true);
+    if (nextIdx === -1) return;
+    gameState.currentPlayerIdx = nextIdx;
+    current = gameState.players[nextIdx];
+  }
+
+  renderSeats();
+  renderActions();
+  if (current.isHuman) { humanTurn(current); }
+  else { setTimeout(() => aiTurn(current), 800); }
+}
+
+function advanceTurn(requireCards = false) {
+  const nextIdx = getNextAliveIndex(gameState.currentPlayerIdx, requireCards);
+  if (nextIdx === -1) return false;
+  gameState.currentPlayerIdx = nextIdx;
+  return true;
+}
+function humanTurn(player) {
+  addLog('👉 轮到你了，请出牌', 'act');
+  renderHand();
+  renderActions();
+  showBubble(player, '轮到你了');
+}
+
+// ==================== AI回合 ====================
+async function aiTurn(player) {
+  if (gameState.gameOver) return;
+
+  // 显示思考中
+  showBubble(player, '思考中', 'thinking');
+  addLog('🤖 【' + player.name + '】正在思考...', 'sys');
+
+  // 思考等待：内置模式长一点更自然；AI模式让LLM调用填充时间
+  const thinkMs = gameState.gameMode === 'ai'
+    ? 1200 + Math.random() * 900
+    : 5000 + Math.random() * 1500;
+  await wait(thinkMs);
+
+  if (gameState.gameOver) return;
+
+  const hand = player.hand;
+  const target = gameState.targetCard;
+  const hasTarget = hand.filter(c => c === target || c === 'Joker');
+  const others = hand.filter(c => c !== target && c !== 'Joker');
+
+  let chosen = [];
+  let isLying = false;
+
+  if (player.personality === 'aggressive') {
+    if (hasTarget.length > 0 && Math.random() < 0.7) {
+      chosen = [hasTarget[0]];
+      if (hasTarget.length > 1 && Math.random() < 0.4) chosen.push(hasTarget[1]);
+    } else if (others.length > 0) {
+      chosen = [others[0]];
+      if (others.length > 1 && Math.random() < 0.3) chosen.push(others[1]);
+      isLying = true;
+    } else if (hasTarget.length > 0) {
+      chosen = [hasTarget[0]];
+    }
+  } else if (player.personality === 'analytical') {
+    if (hasTarget.length >= 2) {
+      chosen = hasTarget.slice(0, 2);
+    } else if (hasTarget.length === 1) {
+      chosen = [hasTarget[0]];
+    } else if (others.length > 0) {
+      chosen = [others[0]];
+      isLying = true;
+    }
+  } else {
+    if (hasTarget.length > 0) {
+      chosen = [hasTarget[0]];
+    } else if (others.length > 0) {
+      chosen = [others[0]];
+      isLying = true;
+    }
+  }
+
+  if (chosen.length === 0 && hand.length > 0) {
+    chosen = [hand[0]];
+    isLying = hand[0] !== target && hand[0] !== 'Joker';
+  }
+
+  // 出牌前表态（性格化、由LLM生成；无API时回退内置语料）
+  const playLine = await getAIBubble(player, 'play', { count: chosen.length });
+  showBubble(player, playLine);
+  addLog('💬 【' + player.name + '】"' + playLine.replace(/\n/g, ' ') + '"', 'dia');
+  await wait(500);
+
+  // 飞行动画：从AI头像飞向桌面（AI出牌显示牌背）
+  animateCardsFromPlayer(player, chosen, () => {
+    if (gameState.gameOver) return;
+    playCards(player, chosen, isLying);
+    if (gameState.gameOver) return;
+    beginChallengeAfterPlay(player, chosen, isLying);
+  }, true); // true = 显示牌背
+}
+
+function getNextAliveIndex(idx, requireCards = false) {
+  let i = (idx + 1) % MAX_PLAYERS;
+  for (let checked = 0; checked < MAX_PLAYERS; checked++) {
+    const player = gameState.players[i];
+    if (player.alive && (!requireCards || player.hand.length > 0)) return i;
+    i = (i + 1) % MAX_PLAYERS;
+  }
+  return -1;
+}
+
+function beginChallengeAfterPlay(playedBy, cards, isLying) {
+  if (gameState.gameOver) return;
+  const playersWithCards = gameState.players.filter(p => p.alive && p.hand.length > 0);
+  const forcedChallenge = playersWithCards.length <= 1;
+  let nextIdx;
+
+  if (forcedChallenge && playersWithCards.length === 1 && playersWithCards[0].id !== playedBy.id) {
+    nextIdx = playersWithCards[0].id;
+  } else {
+    nextIdx = getNextAliveIndex(playedBy.id, !forcedChallenge);
+  }
+  if (nextIdx === -1) return;
+
+  const nextPlayer = gameState.players[nextIdx];
+  gameState.currentPlayerIdx = nextIdx;
+  gameState.awaitingChallenge = true;
+  gameState.forcedChallenge = forcedChallenge;
+
+  if (nextPlayer.isHuman) {
+    addLog(forcedChallenge ? '⚠️ 本轮只剩一名玩家持牌，必须质疑上家！' : '❓ ' + nextPlayer.name + '，是否质疑？', 'chal');
+    renderSeats();
+    renderActions();
+    return;
+  }
+
+  if (playedBy.isHuman) showReactionModal();
+  // 触发其他存活AI对这次出牌的发言（拱火/推理），错峰显示在气泡中
+  triggerBanter(playedBy, cards.length);
+  const baseDelay = playedBy.isHuman ? 2000 : 3000;
+  const extra = gameState.gameMode === 'ai' ? 1600 : 0;
+  setTimeout(() => {
+    if (gameState.gameOver) return;
+    if (playedBy.isHuman) hideReactionModal();
+    aiChallengeDecision(nextPlayer, playedBy, cards, isLying, forcedChallenge);
+  }, baseDelay + extra);
+}
+
+// ==================== 出牌动画 ====================
+function animateCardsFromPlayer(player, cards, callback, showBack) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  const zone = document.getElementById('playZone');
+  if (!seat || !zone) { callback(); return; }
+
+  const seatRect = seat.getBoundingClientRect();
+  const zoneRect = zone.getBoundingClientRect();
+  const startX = seatRect.left + seatRect.width / 2;
+  const startY = seatRect.top + seatRect.height / 2;
+  const endX = zoneRect.left + zoneRect.width / 2;
+  const endY = zoneRect.top + zoneRect.height / 2;
+
+  let completed = 0;
+  cards.forEach((card, i) => {
+    setTimeout(() => {
+      const fly = showBack ? createCardBackElement() : createFlyingCard(card);
+
+      // 起点：玩家头像中心
+      fly.style.left = (startX - 28) + 'px';
+      fly.style.top = (startY - 40) + 'px';
+      fly.style.transform = 'scale(0.6) rotate(0deg)';
+      fly.style.opacity = '0';
+      document.body.appendChild(fly);
+
+      // 第一阶段：弹射起步（放大+旋转+淡入）
+      requestAnimationFrame(() => {
+        fly.style.transition = 'all 0.15s ease-out';
+        fly.style.opacity = '1';
+        fly.style.transform = 'scale(0.9) rotate(' + (i * 5 - 5) + 'deg)';
+      });
+
+      // 第二阶段：弧线飞向桌面
+      const targetLeft = endX - 28 + (i - cards.length / 2 + 0.5) * 40;
+      const targetTop = endY - 40;
+
+      setTimeout(() => {
+        fly.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        fly.style.left = targetLeft + 'px';
+        fly.style.top = targetTop + 'px';
+        fly.style.transform = 'scale(1) rotate(' + (i * 8 - 8 + Math.random() * 10) + 'deg)';
+      }, 150);
+
+      // 第三阶段：落地弹跳
+      setTimeout(() => {
+        fly.style.transition = 'all 0.15s ease-out';
+        fly.style.transform = 'scale(1) rotate(' + (i * 8 - 8) + 'deg) translateY(2px)';
+      }, 650);
+
+      // 清理
+      setTimeout(() => {
+        fly.remove();
+        completed++;
+        if (completed === cards.length) callback();
+      }, 820);
+    }, i * 180); // 多张牌依次飞出
+  });
+}
+
+function createCardBackElement() {
+  const fly = document.createElement('div');
+  fly.className = 'flying-card';
+  fly.style.width = '56px';
+  fly.style.height = '80px';
+  fly.style.borderRadius = '8px';
+  fly.style.background = 'linear-gradient(135deg, #3d2b1f, #2a1810)';
+  fly.style.border = '2px solid #c9a96e';
+  fly.style.display = 'flex';
+  fly.style.alignItems = 'center';
+  fly.style.justifyContent = 'center';
+  fly.style.fontSize = '10px';
+  fly.style.color = 'rgba(201,169,110,0.5)';
+  fly.innerHTML = '♠';
+  return fly;
+}
+
+function createFlyingCard(card) {
+  const fly = document.createElement('div');
+  const isJoker = card === 'Joker';
+  const suit = getCardSuit(card);
+  const colorClass = isJoker ? 'joker' : (suit === '♥' || suit === '♦' ? 'red' : 'black');
+  fly.className = 'flying-card played-card ' + colorClass;
+  fly.style.width = '56px';
+  fly.style.height = '80px';
+
+  if (isJoker) {
+    fly.innerHTML = '<span style="font-size:12px;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">JOKER</span>';
+  } else {
+    fly.innerHTML = '<span class="card-corner top-left">' + card + '<br><span class="suit">' + suit + '</span></span>' +
+      '<span class="card-center">' + suit + '</span>' +
+      '<span class="card-corner bottom-right">' + card + '<br><span class="suit">' + suit + '</span></span>';
+  }
+  return fly;
+}
+
+// ==================== 出牌 ====================
+function playCards(player, cards, isLying) {
+  if (gameState.gameOver) return;
+
+  cards.forEach(c => {
+    const idx = player.hand.indexOf(c);
+    if (idx > -1) player.hand.splice(idx, 1);
+  });
+  gameState.lastPlayedCards = [...cards];
+  gameState.lastPlayerIdx = player.id;
+  player.lastLied = isLying;
+  addLog('🃏 【' + player.name + '】打出 ' + cards.length + ' 张牌 (宣称是 ' + gameState.targetCard + ')', 'act');
+  renderPlayedCards();
+  renderHand();
+  updateDisplay();
+  updateTension(isLying ? 15 : 5);
+
+  // 手牌清空只代表本轮暂时跳过，不代表整局获胜。
+  if (player.hand.length === 0) {
+    addLog('🃏 【' + player.name + '】已清空手牌，本轮跳过后续出牌', 'good');
+  }
+
+  // 检查是否只剩一名存活玩家
+  const aliveCount = gameState.players.filter(p => p.alive).length;
+  if (aliveCount <= 1) {
+    const winner = gameState.players.find(p => p.alive);
+    endGame(winner);
+  }
+}
+
+// ==================== 质疑 ====================
+async function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChallenge = false) {
+  if (gameState.gameOver) return;
+  let shouldChallenge = forceChallenge;
+  const trust = challenger.trustLevels[targetPlayer.name] || 50;
+  const rand = Math.random();
+
+  if (challenger.personality === 'aggressive') {
+    shouldChallenge = isLying ? rand < 0.85 : rand < 0.4;
+  } else if (challenger.personality === 'analytical') {
+    shouldChallenge = isLying ? rand < 0.75 : rand < 0.25;
+  } else {
+    shouldChallenge = isLying ? rand < 0.5 : rand < 0.15;
+  }
+
+  if (cards.length >= 3) shouldChallenge = shouldChallenge || rand < 0.3;
+  if (trust < 30) shouldChallenge = true;
+  if (trust > 80) shouldChallenge = false;
+  if (forceChallenge) shouldChallenge = true;
+
+  if (shouldChallenge) {
+    const dialogue = await getAIBubble(challenger, 'challenge', { actorName: targetPlayer.name, count: cards.length });
+    showBubble(challenger, '质疑!', 'challenge');
+    showNotice(challenger.name + ' 质疑!', 'challenge');
+    addLog('⚡ 【' + challenger.name + '】质疑！"' + dialogue.replace(/\n/g, ' ') + '"', 'chal');
+    gameState.awaitingChallenge = false;
+    setTimeout(() => {
+      if (!gameState.gameOver) {
+        resolveChallenge(challenger, targetPlayer, cards, isLying);
+      }
+    }, 600);
+  } else {
+    const dialogue = await getAIBubble(challenger, 'pass', { actorName: targetPlayer.name });
+    showNotice(challenger.name + ' 不质疑', 'pass');
+    addLog('💬 【' + challenger.name + '】"' + dialogue.replace(/\n/g, ' ') + '" (选择不质疑)', 'dia');
+    gameState.lastPlayerIdx = -1; // 清除质疑状态
+    gameState.awaitingChallenge = false;
+    gameState.forcedChallenge = false;
+    // 不质疑 = 当前玩家继续出牌
+    renderSeats();
+    renderActions();
+    setTimeout(() => {
+      if (!gameState.gameOver) nextTurn();
+    }, 400);
+  }
+}
+
+async function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
+  if (gameState.gameOver) return;
+  const allValid = cards.every(c => c === gameState.targetCard || c === 'Joker');
+
+  // 累计本局统计
+  gameState.challengeCount++;
+  if (!allValid || wasLying) gameState.lieExposedCount++;
+
+  // 无论质疑结果如何，都重置质疑状态
+  gameState.lastPlayerIdx = -1;
+  gameState.awaitingChallenge = false;
+  gameState.forcedChallenge = false;
+
+  if (!allValid || wasLying) {
+    addLog('✅ 【' + challenger.name + '】质疑成功！' + targetPlayer.name + '在说谎', 'good');
+    targetPlayer.caughtLying = true;
+    gameState.players.forEach(p => {
+      if (!p.isHuman && p.id !== targetPlayer.id) p.trustLevels[targetPlayer.name] = Math.max(0, (p.trustLevels[targetPlayer.name] || 50) - 20);
+    });
+    const dialogue = getDialogue(targetPlayer, 'lieCaught');
+    showBubble(targetPlayer, '被揭穿了!', 'challenge');
+    addLog('😅 【' + targetPlayer.name + '】"' + dialogue + '"', 'dia');
+    // 说谎者被惩罚
+    performPenalty(targetPlayer);
+  } else {
+    addLog('❌ 【' + challenger.name + '】质疑失败！' + targetPlayer.name + '说的是真话', 'bad');
+    challenger.trustLevels[targetPlayer.name] = Math.min(100, (challenger.trustLevels[targetPlayer.name] || 50) + 10);
+    // 质疑者被惩罚
+    performPenalty(challenger);
+  }
+  updateDisplay();
+}
+
+// ==================== 惩罚 ====================
+async function performPenalty(player) {
+  if (gameState.gameOver) return;
+  hideReactionModal();
+  const shotNum = player.currentBullet + 1; // 第几枪（1-indexed）
+  let isBullet;
+  if (shotNum >= GUN_CHAMBERS) {
+    isBullet = true; // 第六枪必死
+  } else {
+    isBullet = Math.random() < 0.5; // 前 5 枪各二分之一概率
+  }
+  player.currentBullet = (player.currentBullet + 1) % GUN_CHAMBERS;
+  player.bulletsFired++;
+
+  // 先播放开枪动画序列（枪指向玩家 + 屏幕中心符号 3s）
+  await playPenaltySequence(player, isBullet);
+
+  if (isBullet) {
+    addLog('💥 砰！' + player.name + '中弹了！', 'bad');
+    player.hp = 0;
+    player.alive = false;
+    try {
+      triggerDeathEffects(player);
+    } catch (error) {
+      console.error('triggerDeathEffects failed:', error);
+    }
+
+    const dialogue = getDialogue(player, 'death');
+    showBubble(player, dialogue);
+    addLog('💀 【' + player.name + '】淘汰！"' + dialogue + '"', 'bad');
+  } else {
+    addLog('🔘 咔...' + player.name + '安全，本轮结束', 'sys');
+  }
+
+  gameState.lastPlayerIdx = -1;
+  gameState.awaitingChallenge = false;
+  gameState.forcedChallenge = false;
+  gameState.selectedCards = [];
+  renderSeats();
+  renderActions();
+  updateTension(isBullet ? -20 : -5);
+
+  const alivePlayers = gameState.players.filter(p => p.alive);
+  if (alivePlayers.length <= 1) {
+    setTimeout(() => endGame(alivePlayers[0]), 800);
+    return;
+  }
+
+  // 官方规则：每次质疑及轮盘结算后立即开始新一轮。
+  // 受罚者若存活则先手；若被淘汰则由其下一位存活玩家先手。
+  if (player.alive) {
+    gameState.currentPlayerIdx = player.id;
+  } else {
+    const nextIdx = getNextAliveIndex(player.id, false);
+    if (nextIdx !== -1) gameState.currentPlayerIdx = nextIdx;
+  }
+
+  setTimeout(() => {
+    if (!gameState.gameOver) startRound();
+  }, 1200);
+}
+
+// ==================== 玩家操作 ====================
+function selectCard(idx) {
+  if (!gameState.gameStarted || gameState.gameOver) return;
+  const current = gameState.players[gameState.currentPlayerIdx];
+  if (!current.isHuman) return;
+  // 只有出牌阶段才能选牌（质疑阶段不能选）
+  if (gameState.lastPlayerIdx !== -1 && gameState.lastPlayerIdx !== current.id) return;
+  const i = gameState.selectedCards.indexOf(idx);
+  if (i > -1) gameState.selectedCards.splice(i, 1);
+  else if (gameState.selectedCards.length < 3) gameState.selectedCards.push(idx);
+  renderHand();
+  renderActions();
+}
+
+function confirmPlay() {
+  if (gameState.selectedCards.length === 0) return;
+  const current = gameState.players[gameState.currentPlayerIdx];
+  const cards = gameState.selectedCards.map(i => current.hand[i]);
+  const isLying = cards.some(c => c !== gameState.targetCard && c !== 'Joker');
+
+  animateCardsFromPlayer(current, cards, () => {
+    playCards(current, cards, isLying);
+    if (gameState.gameOver) return;
+    gameState.humanPlayedThisTurn = true;
+    gameState.selectedCards = [];
+    renderHand();
+    beginChallengeAfterPlay(current, cards, isLying);
+  });
+}
+
+function passTurn() {
+  gameState.selectedCards = [];
+  renderHand();
+  advanceTurn();
+  nextTurn();
+}
+
+function humanChallenge() {
+  if (gameState.lastPlayerIdx === -1) return;
+  const target = gameState.players[gameState.lastPlayerIdx];
+  const challenger = gameState.players[gameState.currentPlayerIdx];
+  gameState.lastPlayerIdx = -1;
+  addLog('⚡ 【你】质疑 ' + target.name + '！', 'chal');
+  resolveChallenge(challenger, target, gameState.lastPlayedCards, target.lastLied);
+}
+
+function humanPass() {
+  if (gameState.lastPlayerIdx === -1 || gameState.forcedChallenge) return;
+  const targetName = gameState.players[gameState.lastPlayerIdx]?.name || '上家';
+  gameState.lastPlayerIdx = -1;
+  gameState.awaitingChallenge = false;
+  gameState.forcedChallenge = false;
+  gameState.selectedCards = [];
+  addLog('💬 【你】选择不质疑 ' + targetName, 'dia');
+  const player = gameState.players[0];
+  // 不质疑只保留对决记录，不弹浮层气泡
+  // 不质疑 = 当前玩家出牌（已经是currentPlayerIdx，直接让轮到其出牌）
+  renderSeats();
+  renderHand();
+  renderActions();
+  // 不需要推进currentPlayerIdx，已经是指向当前玩家了
+}
+
+// ==================== 反应选择 ====================
+function showReactionModal() {
+  const modal = document.getElementById('reactionModal');
+  const grid = document.getElementById('reactionGrid');
+  grid.innerHTML = '';
+  const reactions = [
+    { text: '😎 自信', type: 'confident' },
+    { text: '😰 紧张', type: 'nervous' },
+    { text: '🤔 思考', type: 'thinking' },
+    { text: '😏 挑衅', type: 'provoking' },
+    { text: '😐 冷静', type: 'calm' }
+  ];
+  reactions.forEach(r => {
+    const btn = document.createElement('button');
+    btn.className = 'reaction-btn';
+    btn.textContent = r.text;
+    btn.onclick = () => { applyReaction(r.type); hideReactionModal(); };
+    grid.appendChild(btn);
+  });
+  modal.classList.add('show');
+  setTimeout(() => { if (modal.classList.contains('show')) { hideReactionModal(); } }, 4000);
+}
+function hideReactionModal() { document.getElementById('reactionModal').classList.remove('show'); }
+
+function applyReaction(type) {
+  const human = gameState.players[0];
+  gameState.players.forEach(p => {
+    if (!p.isHuman) {
+      let change = 0;
+      if (type === 'confident') change = p.personality === 'aggressive' ? -5 : 5;
+      else if (type === 'nervous') change = p.personality === 'timid' ? 5 : -10;
+      else if (type === 'provoking') change = p.personality === 'aggressive' ? -15 : 5;
+      else if (type === 'calm') change = 5;
+      p.trustLevels[human.name] = Math.max(0, Math.min(100, (p.trustLevels[human.name] || 50) + change));
+    }
+  });
+  renderSeats();
+}
+
+// ==================== 渲染 ====================
+function renderSeats() {
+  const board = document.getElementById('gameBoard');
+  board.querySelectorAll('.seat').forEach(s => s.remove());
+
+  // 计算下一位存活玩家
+  let nextIdx = -1;
+  if (gameState.gameStarted && !gameState.gameOver) {
+    nextIdx = getNextAliveIndex(gameState.currentPlayerIdx);
+  }
+
+  gameState.players.forEach(p => {
+    const isActive = p.id === gameState.currentPlayerIdx && gameState.gameStarted && !gameState.gameOver;
+    const isNextUp = p.id === nextIdx && nextIdx !== gameState.currentPlayerIdx && p.alive;
+    const seat = document.createElement('div');
+    seat.className = 'seat' + (isActive ? ' active' : '') + (isNextUp ? ' next-up' : '') + (!p.alive ? ' dead' : '');
+    seat.dataset.pos = p.seatPos;
+    seat.dataset.id = p.id;
+
+    // 下一位标签
+    if (isNextUp) {
+      const nextLabel = document.createElement('div');
+      nextLabel.className = 'next-up-label';
+      nextLabel.textContent = '下一位';
+      seat.appendChild(nextLabel);
+    }
+
+    // 头像
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar-box';
+    const img = document.createElement('img');
+    img.src = p.avatar || '';
+    img.alt = p.name;
+    img.onerror = () => { img.style.display = 'none'; };
+    const fallback = document.createElement('span');
+    fallback.className = 'fallback';
+    fallback.textContent = p.name[0] || '?';
+    avatar.appendChild(img);
+    avatar.appendChild(fallback);
+    if (!p.alive) {
+      const skull = document.createElement('div');
+      skull.className = 'dead-skull';
+      skull.innerHTML = '&#x2620;';
+      avatar.appendChild(skull);
+    }
+
+    // 信息面板
+    const info = document.createElement('div');
+    info.className = 'info-panel';
+    const roleText = p.isHuman ? '玩家' : (p.personality === 'aggressive' ? '激进' : p.personality === 'analytical' ? '理性' : '谨慎');
+    info.innerHTML = '<div class="info-name">' + p.name + '</div><div class="info-role">' + roleText + '</div>';
+
+    // 手牌数量 (游戏开始后显示)
+    const handCount = document.createElement('div');
+    handCount.className = 'hand-count' + (p.hand.length === 0 ? ' empty' : '');
+    handCount.textContent = '🃏 ' + p.hand.length;
+    info.appendChild(handCount);
+
+    // HP
+    const hpBox = document.createElement('div');
+    hpBox.className = 'hp-box';
+    const hp = Math.max(0, p.hp);
+    for (let i = 0; i < MAX_HP; i++) {
+      const seg = document.createElement('div');
+      seg.className = 'hp-seg';
+      if (i < hp) {
+        seg.classList.add('on');
+        if (hp <= 2) seg.classList.add('danger');
+        else if (hp <= 3) seg.classList.add('warn');
+      }
+      hpBox.appendChild(seg);
+    }
+
+    // 弹舱
+    const gunBox = document.createElement('div');
+    gunBox.className = 'gun-box';
+    for (let i = 0; i < GUN_CHAMBERS; i++) {
+      const ch = document.createElement('div');
+      let cls = 'gun-ch';
+      if (i === p.currentBullet) cls += ' current';
+      if (p.bulletsFired > 0) {
+        // 已开过的弹舱位置（按currentBullet回绕计算）
+        let isSpent = false;
+        let pos = p.currentBullet - 1;
+        for (let s = 0; s < p.bulletsFired; s++) {
+          if (pos < 0) pos = GUN_CHAMBERS - 1;
+          if (i === pos) { isSpent = true; break; }
+          pos--;
+        }
+        if (isSpent) cls += ' spent';
+      }
+      if (i === GUN_CHAMBERS - 1) cls += ' lethal'; // 第六枪必死
+      ch.className = cls;
+      gunBox.appendChild(ch);
+    }
+
+    // 信任度 (仅AI)
+    if (!p.isHuman) {
+      const trustBox = document.createElement('div');
+      trustBox.className = 'trust-box';
+      const human = gameState.players[0];
+      const t = p.trustLevels[human?.name] || 50;
+      for (let i = 0; i < 5; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'trust-dot' + (t > 60 ? ' high' : t > 30 ? ' med' : ' low');
+        trustBox.appendChild(dot);
+      }
+      info.appendChild(trustBox);
+    }
+
+    seat.appendChild(avatar);
+    seat.appendChild(info);
+    seat.appendChild(hpBox);
+    seat.appendChild(gunBox);
+
+    board.insertBefore(seat, board.querySelector('.center-area'));
+  });
+
+}
+
+function renderHand(isDeal) {
+  const wrap = document.getElementById('handWrap');
+  const label = document.getElementById('handLabel');
+  wrap.innerHTML = '';
+  const human = gameState.players[0];
+  if (!gameState.gameStarted) { label.textContent = '等待游戏开始...'; return 0; }
+  if (gameState.gameOver) { label.textContent = '游戏结束'; return 0; }
+  if (!human.alive) { label.textContent = '你已淘汰'; return 0; }
+  label.textContent = '你的手牌 (' + human.hand.length + '张)' + (gameState.targetCard ? ' - 目标牌: ' + gameState.targetCard : '') + ':';
+  const count = human.hand.length;
+  const stepMs = count > 1 ? Math.round(3000 / count) : 0;
+  // 发牌动画总时长：最后一张的延迟 + 单张动画(0.5s)，用于让后续游戏流程等它播完
+  const dealDuration = isDeal && count > 0 ? (count - 1) * stepMs + 500 : 0;
+  human.hand.forEach((card, i) => {
+    const anim = isDeal
+      ? { name: 'cardDeal', delay: i * stepMs }
+      : { name: 'cardEnter' };
+    wrap.appendChild(createCardElement(card, i, gameState.selectedCards.includes(i), anim));
+  });
+  return dealDuration;
+}
+
+function createCardElement(card, index, isSelected, anim) {
+  const div = document.createElement('div');
+  const isJoker = card === 'Joker';
+  const suit = getCardSuit(card);
+  const colorClass = isJoker ? 'joker' : (suit === '♥' || suit === '♦' ? 'red' : 'black');
+  div.className = 'playing-card ' + colorClass + (isSelected ? ' selected' : '');
+
+  if (isJoker) {
+    div.innerHTML = '<span class="joker-text">JOKER</span>';
+  } else {
+    div.innerHTML = '<span class="card-corner top-left">' + card + '<br><span class="suit">' + suit + '</span></span>' +
+      '<span class="card-center">' + suit + '</span>' +
+      '<span class="card-corner bottom-right">' + card + '<br><span class="suit">' + suit + '</span></span>';
+  }
+
+  if (index !== undefined) {
+    div.onclick = () => selectCard(index);
+  }
+
+  // 入场动画：发牌时从左往右逐张铺开，其余情况用 cardEnter 弹出
+  if (anim && anim.name) {
+    div.style.animation = anim.name + ' 0.5s ease-out backwards';
+    if (anim.delay) div.style.animationDelay = anim.delay + 'ms';
+    div.addEventListener('animationend', function () {
+      div.style.animation = '';
+      div.style.animationDelay = '';
+    }, { once: true });
+  }
+  return div;
+}
+
+function getCardSuit(card) {
+  if (card === 'Joker') return '';
+  const suits = ['♠', '♥', '♣', '♦'];
+  return suits[Math.abs(card.charCodeAt(0) * 7 + card.length * 3) % 4];
+}
+
+function createPlayedCardElement(card) {
+  const div = document.createElement('div');
+  div.className = 'played-card';
+  // 始终显示牌背，隐藏真实牌面
+  div.innerHTML = '<span style="font-size:16px;color:rgba(201,169,110,0.6)">♠</span>';
+  return div;
+}
+
+function positionActionBar() {
+  const area = document.getElementById('actionArea');
+  const panel = document.getElementById('bottomPanel');
+  if (area && panel) area.style.bottom = (panel.offsetHeight + 14) + 'px';
+}
+window.addEventListener('resize', positionActionBar);
+
+function renderActions() {
+  const area = document.getElementById('actionArea');
+  area.innerHTML = '';
+  if (!gameState.gameStarted || gameState.gameOver) {
+    area.innerHTML = '<button class="btn btn-gold" onclick="showModeModal()">开始游戏</button>';
+    positionActionBar();
+    return;
+  }
+  const current = gameState.players[gameState.currentPlayerIdx];
+  if (!current || !current.isHuman) return;
+
+  // 质疑阶段：上家出了牌，当前玩家是下家
+  if (gameState.lastPlayerIdx !== -1 && gameState.lastPlayerIdx !== current.id) {
+    area.innerHTML = gameState.forcedChallenge
+      ? '<span class="forced-notice">本轮只剩一名玩家持牌，必须质疑</span><button class="btn btn-red" onclick="humanChallenge()">质疑!</button>'
+      : '<button class="btn btn-red" onclick="humanChallenge()">质疑!</button><button class="btn btn-green" onclick="humanPass()">不质疑</button>';
+    positionActionBar();
+    return;
+  }
+
+  // 出牌阶段
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-gold';
+  btn.textContent = '出牌 (' + gameState.selectedCards.length + '/3)';
+  btn.disabled = gameState.selectedCards.length === 0;
+  btn.onclick = confirmPlay;
+  area.appendChild(btn);
+  positionActionBar();
+}
+
+function renderTarget() {
+  const display = document.getElementById('targetCardDisplay');
+  const value = document.getElementById('targetCardValue');
+  if (gameState.gameStarted && gameState.targetCard) {
+    display.style.display = 'block';
+    value.textContent = gameState.targetCard;
+  } else {
+    display.style.display = 'none';
+  }
+}
+
+function renderPlayedCards() {
+  const zone = document.getElementById('playZone');
+  const empty = document.getElementById('playZoneEmpty');
+  // 清除旧牌，只保留装饰元素
+  zone.querySelectorAll('.played-card').forEach(el => el.remove());
+
+  if (gameState.lastPlayedCards.length === 0) {
+    if (empty) empty.style.display = 'flex';
+  } else {
+    if (empty) empty.style.display = 'none';
+    gameState.lastPlayedCards.forEach(card => {
+      zone.appendChild(createPlayedCardElement(card));
+    });
+  }
+}
+
+function renderTension() {
+  const wrap = document.getElementById('tensionWrap');
+  const fill = document.getElementById('tensionFill');
+  if (gameState.gameStarted) {
+    wrap.style.display = 'block';
+    fill.style.width = Math.min(100, gameState.tension) + '%';
+    fill.style.background = gameState.tension > 70 ? 'var(--accent-red)' : gameState.tension > 40 ? 'var(--accent-gold)' : 'var(--accent-green)';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function updateDisplay() {
+  document.getElementById('roundDisplay').textContent = gameState.roundCount;
+  document.getElementById('aliveDisplay').textContent = gameState.players.filter(p => p.alive).length;
+  const td = document.getElementById('targetDisplay');
+  const tv = document.getElementById('targetValue');
+  if (gameState.gameStarted && gameState.targetCard) { td.style.display = ''; tv.textContent = gameState.targetCard; }
+  else { td.style.display = 'none'; }
+  
+  // 牌堆剩余
+  const deckEl = document.getElementById('deckCount');
+  const deckVal = document.getElementById('deckValue');
+  if (gameState.gameStarted) { deckEl.style.display = ''; deckVal.textContent = gameState.deck.length; }
+  else { deckEl.style.display = 'none'; }
+  
+  // 上家出牌数
+  const lastEl = document.getElementById('lastPlayCount');
+  const lastVal = document.getElementById('lastPlayValue');
+  if (gameState.gameStarted && gameState.lastPlayedCards.length > 0) { lastEl.style.display = ''; lastVal.textContent = gameState.lastPlayedCards.length; }
+  else { lastEl.style.display = 'none'; }
+
+  updateSideInfo();
+}
+
+function updateSideInfo() {
+  const targetInfo = document.getElementById('targetInfo');
+  const gunInfo = document.getElementById('gunInfo');
+  if (!targetInfo || !gunInfo) return;
+
+  if (!gameState.gameStarted || gameState.gameOver) {
+    targetInfo.style.opacity = '0.45';
+    gunInfo.style.opacity = '0.45';
+    document.getElementById('statChallenge').textContent = '0';
+    document.getElementById('statExpose').textContent = '0';
+    document.getElementById('opponentCards').innerHTML = '<div class="opp-empty">对手牌数</div>';
+    return;
+  }
+  targetInfo.style.opacity = '1';
+  gunInfo.style.opacity = '1';
+
+  // 左侧：本局揭穿统计（质疑次数 / 被揭穿=抓到说谎次数）
+  document.getElementById('statChallenge').textContent = gameState.challengeCount || 0;
+  document.getElementById('statExpose').textContent = gameState.lieExposedCount || 0;
+
+  // 右侧：只显示各存活对手的剩余手牌（每次出牌后刷新）
+  const oppLines = gameState.players
+    .filter(p => p.id !== 0 && p.alive)
+    .map(p => '<div class="opp-row"><span class="opp-name">' + p.name + '</span><span class="opp-count">' + p.hand.length + '张</span></div>');
+  document.getElementById('opponentCards').innerHTML = oppLines.length
+    ? oppLines.join('')
+    : '<div class="opp-empty">无对手</div>';
+}
+
+// ==================== 对话气泡 ====================
+function showBubble(player, text, type) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return;
+
+  // 移除旧的同位置气泡
+  const oldId = 'bubble-' + player.id;
+  const oldBubble = document.getElementById(oldId);
+  if (oldBubble) oldBubble.remove();
+
+  // 创建新气泡
+  const bubble = document.createElement('div');
+  bubble.id = oldId;
+  bubble.className = 'bubble' + (type ? ' ' + type : '');
+  if (type === 'thinking') {
+    bubble.innerHTML = '<span class="thinking-dots">思考中<span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
+  } else {
+    // 支持多行（LLM 返回的若干短句）：转义后换行转 <br>
+    const esc = document.createElement('div');
+    esc.textContent = text;
+    bubble.innerHTML = esc.innerHTML.replace(/\n/g, '<br>');
+  }
+  document.body.appendChild(bubble);
+
+  // 定位：基于座位位置，在头像/座位旁边固定方向显示，避免贴近顶部标题栏
+  requestAnimationFrame(() => {
+    const avatar = seat.querySelector('.avatar-box');
+    const seatRect = seat.getBoundingClientRect();
+    const avatarRect = avatar ? avatar.getBoundingClientRect() : seatRect;
+    const bw = 180;
+    const bh = 50;
+    const scrW = window.innerWidth;
+    const scrH = window.innerHeight;
+    const pos = seat.dataset.pos;
+    const TOP_BAR_H = 56; // 顶部栏高度参考值
+
+    let tx, ty;
+    const pad = 12; // 与头像的间距
+
+    if (pos === 'top') {
+      // 顶部玩家气泡放在整个座位下方，避免压在标题栏上
+      tx = seatRect.left + seatRect.width / 2;
+      ty = seatRect.bottom + pad + bh / 2;
+    } else if (pos === 'bottom') {
+      tx = avatarRect.left + avatarRect.width / 2;
+      ty = avatarRect.top - pad - bh / 2;
+    } else if (pos === 'left') {
+      tx = avatarRect.right + pad + bw / 2;
+      ty = avatarRect.top + avatarRect.height / 2;
+    } else if (pos === 'right') {
+      tx = avatarRect.left - pad - bw / 2;
+      ty = avatarRect.top + avatarRect.height / 2;
+    } else {
+      tx = avatarRect.left + avatarRect.width / 2;
+      ty = avatarRect.top - pad - bh / 2;
+    }
+
+    // 边界限制：x 不超出屏幕，y 不低于顶部栏
+    tx = Math.max(bw / 2 + 5, Math.min(scrW - bw / 2 - 5, tx));
+    ty = Math.max(TOP_BAR_H + bh / 2 + 8, Math.min(scrH - bh / 2 - 5, ty));
+
+    bubble.style.left = tx + 'px';
+    bubble.style.top = ty + 'px';
+    bubble.classList.add('show');
+  });
+
+  // 思考气泡持续到被下一次showBubble替换或手动移除；其他气泡3.5秒后消失
+  const duration = type === 'thinking' ? 30000 : 3500;
+  setTimeout(() => {
+    if (bubble.parentNode && (type !== 'thinking' || !bubble.dataset.persist)) bubble.remove();
+  }, duration);
+}
+
+// ==================== 左上角通知 ====================
+function showNotice(text, type) {
+  const area = document.getElementById('noticeArea');
+  if (!area) return;
+  const item = document.createElement('div');
+  item.className = 'notice-item ' + type;
+  const icon = type === 'challenge' ? '⚡' : '✓';
+  item.innerHTML = '<span class="notice-icon">' + icon + '</span><span>' + text + '</span>';
+  area.appendChild(item);
+  requestAnimationFrame(() => item.classList.add('show'));
+  setTimeout(() => {
+    item.classList.add('hide');
+    setTimeout(() => { if (item.parentNode) item.remove(); }, 300);
+  }, 2500);
+}
+
+function getDialogue(player, situation) {
+  const pool = DIALOGUE_POOL[player.personality] || {};
+  const lines = pool[situation] || ['...'];
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+// ==================== LLM 接入 ====================
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+
+// 调用 OpenAI 兼容接口。优先使用玩家独立API，否则用总API。
+// 返回文本字符串，失败/超时/未配置返回 null。
+async function callAI(player, systemPrompt, userPrompt) {
+  const useOwn = player && player.api && player.api.useOwn && player.api.apiUrl;
+  const cfg = useOwn
+    ? { apiUrl: player.api.apiUrl, model: player.api.model, apiKey: player.api.apiKey }
+    : gameState.config;
+  const apiUrl = (cfg.apiUrl || '').trim();
+  const apiKey = (cfg.apiKey || '').trim();
+  const model = (cfg.model || 'gpt-4').trim();
+  if (!apiUrl) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 9000);
+  try {
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'Authorization': 'Bearer ' + apiKey } : {})
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.9,
+        max_tokens: 240
+      }),
+      signal: controller.signal
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const text = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    return text ? text.trim() : null;
+  } catch (e) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 取得某 AI 玩家的发言。无 API / 非 ai 模式时回退到内置语料。
+// situation: 'banter'（对出牌的反应）| 'play'（出牌前表态）| 'challenge' | 'pass'
+async function getAIBubble(player, situation, extra) {
+  extra = extra || {};
+  if (gameState.gameMode !== 'ai') return getDialogue(player, situation);
+
+  const target = gameState.targetCard;
+  const round = gameState.roundCount;
+  const aliveNames = gameState.players.filter(p => p.alive).map(p => p.name).join('、');
+  const ownHand = player.hand.map(c => {
+    if (c === 'Joker') return 'Joker(万能)';
+    if (c === target) return c + '(目标)';
+    return c;
+  }).join('、');
+
+  const baseSystem =
+    '你是名为「' + player.name + '」的玩家，正在玩《骗子酒馆》卡牌游戏。' + (player.personalityText || '') +
+    '\n规则：每轮从Q/K/A中随机一张作为目标牌，玩家轮流出牌并宣称打出的都是目标牌（牌背朝上，别的玩家看不到真伪）。下一位玩家可选择质疑或相信。' +
+    '\n严格限制：你【只能】知道【你自己】的手牌，绝对不能知道其他任何玩家的手牌，也不能知道别人是否说谎。你只能依据公开信息和推理来发言。' +
+    '\n发言要求：用中文、口语化、贴合你的性格；说1到5句，每句简短（最好不超过20字）；可以拱火、挑衅、分析推理或装无辜，但绝不要暴露你知道别人的牌。直接输出句子，用换行分隔，不要加引号或"我说："之类前缀。';
+
+  let userPrompt = '';
+  if (situation === 'banter') {
+    userPrompt = '公开信息：本轮目标牌是' + target + '，第' + round + '轮，存活玩家：' + aliveNames + '。\n刚才【' + (extra.actorName || '某人') + '】打出了' + (extra.count || '?') + '张牌，宣称是目标牌（你不知真假）。\n你自己的手牌：' + ownHand + '。\n请对这次出牌发表你的反应（怀疑、拱火、分析或装怂均可），1到5句。';
+  } else if (situation === 'play') {
+    userPrompt = '轮到你出牌。公开信息：目标牌' + target + '，第' + round + '轮。你手牌：' + ownHand + '。你准备打出' + (extra.count || 1) + '张并宣称是目标牌。用你的性格说一句出牌前的表态（1到2句，简短）。';
+  } else if (situation === 'challenge') {
+    userPrompt = '上家【' + (extra.actorName || '某人') + '】打出' + (extra.count || '?') + '张并宣称是目标牌。轮到你决定是否质疑。用你的性格说一句（质疑就挑衅地质疑，不质疑就装作相信），1到2句简短。';
+  } else if (situation === 'pass') {
+    userPrompt = '你决定不质疑上家【' + (extra.actorName || '某人') + '】。用你的性格说一句（装作相信或留待观察），1到2句简短。';
+  } else {
+    return getDialogue(player, situation);
+  }
+
+  const text = await callAI(player, baseSystem, userPrompt);
+  if (text) return text;
+  return getDialogue(player, situation === 'banter' ? 'play' : situation);
+}
+
+// 某人出牌后，其他存活 AI 各自发表 1~5 句短评（错峰显示）
+async function triggerBanter(actor, count) {
+  if (gameState.gameMode !== 'ai' || gameState.gameOver) return;
+  const reactors = gameState.players.filter(p => p.alive && !p.isHuman && p.id !== actor.id);
+  if (reactors.length === 0) return;
+  const jobs = reactors.map(p => getAIBubble(p, 'banter', { actorName: actor.name, count })
+    .then(text => ({ p, text }))
+    .catch(() => ({ p, text: null })));
+  const results = await Promise.all(jobs);
+  results.forEach((r, i) => {
+    if (r.text) {
+      setTimeout(() => { if (!gameState.gameOver) showBubble(r.p, r.text); }, 500 + i * 700);
+    }
+  });
+}
+
+// ==================== 惩罚结果弹窗 ====================
+function showPenaltyPopup(player, isBullet) {
+  // 移除已有弹窗
+  const old = document.getElementById('penaltyPopup');
+  if (old) old.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'penaltyPopup';
+  popup.className = 'penalty-popup' + (isBullet ? ' bullet' : ' empty');
+
+  if (isBullet) {
+    popup.innerHTML = 
+      '<div class="penalty-icon">💥</div>' +
+      '<div class="penalty-title">砰！</div>' +
+      '<div class="penalty-desc">' + player.name + ' 中弹了！</div>' +
+      '<div class="penalty-sub">被淘汰出局</div>';
+  } else {
+    popup.innerHTML = 
+      '<div class="penalty-icon">🔘</div>' +
+      '<div class="penalty-title">咔...</div>' +
+      '<div class="penalty-desc">' + player.name + ' 安全！</div>' +
+      '<div class="penalty-sub">空弹，继续游戏</div>';
+  }
+
+  document.body.appendChild(popup);
+
+  // 以游戏牌桌中心为定位点，而非屏幕中心
+  const board = document.getElementById('gameBoard');
+  if (board) {
+    const rect = board.getBoundingClientRect();
+    popup.style.top = (rect.top + rect.height / 2) + 'px';
+    popup.style.left = (rect.left + rect.width / 2) + 'px';
+  }
+
+  // 触发入场动画
+  requestAnimationFrame(() => {
+    popup.classList.add('show');
+  });
+
+  // 1.8秒后自动移除
+  setTimeout(() => {
+    if (popup.parentNode) {
+      popup.classList.remove('show');
+      popup.classList.add('hide');
+      setTimeout(() => { if (popup.parentNode) popup.remove(); }, 400);
+    }
+  }, 1800);
+}
+
+// ==================== 特效 ====================
+function triggerScreenShake() {
+  document.body.classList.add('shake');
+  setTimeout(() => document.body.classList.remove('shake'), 400);
+}
+
+function triggerDeathEffects(player) {
+  // 屏幕震动
+  triggerScreenShake();
+
+  // 红色全屏脉冲
+  const overlay = document.createElement('div');
+  overlay.className = 'death-overlay';
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 600);
+
+  // 座位红色闪烁
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (seat) {
+    seat.classList.add('flash-red');
+    setTimeout(() => seat.classList.remove('flash-red'), 400);
+  }
+
+  // 子弹时间
+  document.body.classList.add('bullet-time');
+  setTimeout(() => document.body.classList.remove('bullet-time'), 300);
+
+  // 冲击波环
+  triggerShockwave(player);
+
+  // 火花粒子（金色+红色混合）
+  triggerParticles(player, 30, 'spark');
+
+  // 烟雾粒子
+  setTimeout(() => triggerParticles(player, 12, 'smoke'), 200);
+}
+
+function triggerShockwave(player) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return;
+  const rect = seat.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  for (let i = 0; i < 2; i++) {
+    const ring = document.createElement('div');
+    ring.style.cssText = 'position:fixed;left:' + cx + 'px;top:' + cy + 'px;width:10px;height:10px;border-radius:50%;border:3px solid #ff4444;pointer-events:none;z-index:899;transform:translate(-50%,-50%);';
+    document.body.appendChild(ring);
+    ring.animate([
+      { width: '10px', height: '10px', opacity: 0.8, borderWidth: '3px' },
+      { width: '160px', height: '160px', opacity: 0, borderWidth: '1px' }
+    ], { duration: 600 + i * 200, delay: i * 100, easing: 'cubic-bezier(0.1,0.7,0.3,1)' });
+    setTimeout(() => ring.remove(), 900);
+  }
+}
+
+function triggerParticles(player, count, type) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return;
+  const rect = seat.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  type = type || 'blood';
+  const num = count || 16;
+
+  for (let i = 0; i < num; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = cx + 'px';
+    p.style.top = cy + 'px';
+
+    if (type === 'spark') {
+      // 火花：金色/红色小亮点，快速四散
+      const size = 2 + Math.random() * 5;
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      p.style.borderRadius = '50%';
+      p.style.background = i % 2 === 0 ? '#ffcc00' : '#ff3333';
+      p.style.boxShadow = '0 0 6px ' + (i % 2 === 0 ? '#ffaa00' : '#ff4444');
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 30 + Math.random() * 100;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      p.animate([
+        { transform: 'translate(0,0) scale(1)', opacity: 1 },
+        { transform: 'translate(' + dx * 0.5 + 'px,' + dy * 0.5 + 'px) scale(1.2)', opacity: 1, offset: 0.2 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.2)', opacity: 0 }
+      ], { duration: 500 + Math.random() * 500, easing: 'cubic-bezier(0.15,0.6,0.3,1)' });
+    } else if (type === 'smoke') {
+      // 烟雾：灰色半透明，缓慢上升膨胀
+      const size = 15 + Math.random() * 25;
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      p.style.borderRadius = '50%';
+      p.style.background = 'rgba(100,100,100,' + (0.3 + Math.random() * 0.3) + ')';
+
+      const dx = (Math.random() - 0.5) * 60;
+      const dy = -40 - Math.random() * 60;
+      p.animate([
+        { transform: 'translate(0,0) scale(0.5)', opacity: 0.6 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(2)', opacity: 0 }
+      ], { duration: 800 + Math.random() * 600, easing: 'ease-out' });
+    } else {
+      // 默认血液粒子
+      const size = 3 + Math.random() * 4;
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      p.style.background = i % 3 === 0 ? '#ff6b6b' : i % 3 === 1 ? '#ff4444' : '#cc0000';
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 40 + Math.random() * 80;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist + 80;
+      p.animate([
+        { transform: 'translate(0,0) scale(1)', opacity: 1 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.3)', opacity: 0 }
+      ], { duration: 600 + Math.random() * 400, easing: 'cubic-bezier(0.2,0.6,0.4,1)' });
+    }
+
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1200);
+  }
+}
+
+// ==================== 开枪与中心符号特效 ====================
+function aimGunAt(player) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return null;
+  const avatar = seat.querySelector('.avatar-box');
+  const rect = avatar ? avatar.getBoundingClientRect() : seat.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const halfSize = Math.max(rect.width, rect.height) / 2;
+  const pos = seat.dataset.pos;
+
+  const gun = document.createElement('div');
+  gun.className = 'gun-pos';
+  gun.innerHTML = '<div class="gun-aimer"><img class="gun-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NzgiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIyNiAtNDAgNDc4IDQwMCI+DQogIDxkZWZzPg0KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZ3VuR3JhZCIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPg0KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZWVmM2Y2Ii8+DQogICAgICA8c3RvcCBvZmZzZXQ9IjAuMzUiIHN0b3AtY29sb3I9IiNiNmMyYzgiLz4NCiAgICAgIDxzdG9wIG9mZnNldD0iMC42MiIgc3RvcC1jb2xvcj0iIzc5ODY4YyIvPg0KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNDU0ZjU0Ii8+DQogICAgPC9saW5lYXJHcmFkaWVudD4NCiAgPC9kZWZzPg0KPHBhdGggZmlsbD0idXJsKCNndW5HcmFkKSIgZD0iTTQ0MC4yMjUgMTI5LjUyMmgzMS42NFYxMTUuODdINDYwLjAyem0tMzkyLjc1IDM2LjI5M3YtLjA4NGEuNDgzLjQ4MyAwIDAgMSAwLS4wODQuMTc5LjE3OSAwIDAgMCAwLS4xMjZsLS4wODQtLjMzNmExMy4zNTggMTMuMzU4IDAgMCAwLS45MTMtMi4zMjEgMjIuNjIgMjIuNjIgMCAwIDAtMS45NzUtMy4zMDggMjIuMzg5IDIyLjM4OSAwIDAgMC0xLjM5Ni0xLjc3NWMtLjI2My0uMjk0LS41MTUtLjU5OC0uNzg4LS44OTJsLS44NjEtLjg0YTIyLjg2MSAyMi44NjEgMCAwIDAtMS44NTktMS42MThjLS42My0uNTQ2LTEuMzIzLS45NDUtMS45OTUtMS40MTctLjY3Mi0uNDczLTEuMzY1LS43ODgtMi4wMjctMS4xNzdhMTYuODAyIDE2LjgwMiAwIDAgMC0xLjk0My0uOTEzYy0uNjItLjI1Mi0xLjE5Ny0uNTQ2LTEuNzIyLS42OTNsLTEuMzc1LS40NDEtMS4yMy0uMzc4IDEuMjMtLjM4OSAxLjQzOC0uNDQxYy41NjctLjE4OSAxLjIwOC0uMjczIDEuOTIyLS40NDFhMTkuNjI3IDE5LjYyNyAwIDAgMSAyLjM1Mi0uMzg5Yy44NC0uMDczIDEuNzY1LS4yMiAyLjcxLS4yMy45NDUtLjAxMSAxLjk2My0uMDY0IDIuOTcyIDBhMzEuMDIgMzEuMDIgMCAwIDEgMy4xNS4zMTRsMS41ODYuMjYzYy41MjUuMTA1IDEuMDUuMjMxIDEuNTU0LjM1NyAxLjA1LjIzMSAyLjA0OC41NTcgMy4wMzUuODcyLjk4Ny4zMTUgMS43OTUuNjUgMi42MzYgMS4wNWE1MS4zOTMgNTEuMzkzIDAgMCAwLTUuMTQ2IDE0LjU1NXptMTU4Ljc2IDkzLjY3MWMuMTY3IDEuNDQuMzc3IDIuODE1LjY0IDQuMTE3YTI5LjU1IDI5LjU1IDAgMCAwIC45NjYgMy41NyAxNS4yNTggMTUuMjU4IDAgMCAwIDEuMjgxIDIuODI1IDcuMTkzIDcuMTkzIDAgMCAwIC43MjUgMS4wNSA1Ljk1NCA1Ljk1NCAwIDAgMCAuNzI0Ljg0bC42NzIuNjFjLjIyLjE0Ny40Mi4yNjIuNTc4LjM1N2wuNDkzLjMwNC0uNTY3LS4xMTVjLS4xODkgMC0uNDMtLjA4NC0uNzAzLS4xNThsLS45MDMtLjM2N2E2LjcyIDYuNzIgMCAwIDEtMS4wNS0uNTk5IDguNDAxIDguNDAxIDAgMCAxLTEuMTg3LS44NzIgMTcuMzM4IDE3LjMzOCAwIDAgMS0yLjQ1Ny0yLjUyIDMyLjgzOCAzMi44MzggMCAwIDEtMi4zODQtMy4zOTIgNTMuNDUxIDUzLjQ1MSAwIDAgMS0yLjIwNS00LjAzMiA5MS40OTggOTEuNDk4IDAgMCAxLTMuODQ0LTkuMTM3IDE0My4xNCAxNDMuMTQgMCAwIDEtMi40NjgtNy40MzQgMjIuODIgMjIuODIgMCAwIDEgMTEuNTUyLTMuODMzYy0uMiAzLjA2Ni0uMzM2IDYuMy0uMzI2IDkuNjRhODQuNjEgODQuNjEgMCAwIDAgLjQ2MiA5LjE0NnptMzQuNjU0IDI4Ljg5YTkuMDczIDkuMDczIDAgMCAwIDkuMDczLTkuMDc0di0zOC41Nmg1Ljk1NHY0NC41MjVhOS4wNzMgOS4wNzMgMCAwIDEtOS4wNzMgOS4wNzNoLTY1LjM4MWwxLjM2NS01Ljk1NGg1OC4wNTF6bTIzNi40OS04MS44MzdINTQuMDE3QzQ0LjU2NiAyMTcuMDQgMjYgMjE5Ljg4NiAyNiAyMjUuNDRjMCA2LjgxNiA1Mi4wNzYtOC40IDUwLjk3MyAzMC42MDEtMS43MjIgNjAuNzgyLTMxLjcwMyA2MC43OTItMzUuOTg4IDEyNS43MzJhMTMuNDYzIDEzLjQ2MyAwIDAgMCAxMy40MSAxNC4zNTZoNzQuNDAyYTE2LjE3MiAxNi4xNzIgMCAwIDAgMTUuODQ3LTEyLjk4YzEwLjMxMi01MS4xNjIgMjIuMjMxLTk4LjgzOCAzMC45MTYtMTM5LjA1OSAzLjAyNC0xNC4wMTkgMjAuNDU2LTIwLjE1MiAzMC41MzgtMjAuMTUyaDIzNi41MWE0My4zNyA0My4zNyAwIDAgMCAzNC43Ny0xNy40ek0xMDEuNzI0IDM1NS45NjJhMTEuOTYxIDExLjk2MSAwIDEgMS0xMS45NjEgMTEuOTYxIDExLjk2MSAxMS45NjEgMCAwIDEgMTEuOTYxLTExLjk2em0yNy40NS03MC44MWExMS45NjEgMTEuOTYxIDAgMSAxLTExLjk2LTExLjk2MSAxMS45NjEgMTEuOTYxIDAgMCAxIDExLjk3MSAxMS45NnpNODcuMTcgMTQ2LjMyNGgzODUuNDkzQTEzLjM3OSAxMy4zNzkgMCAwIDEgNDg2IDE1OS43MDN2MjAuODAzYTQzLjU3IDQzLjU3IDAgMCAxLS45OTggOS4yM0g2MC4xNWMxLjM0NC01LjM5NyA0LjA0My0xNi40NDQgNC45NDYtMjEuMzA3IDIuMjQ4LTEyLjAwMyA5LjkwMy0yMi4xMDUgMjIuMTE2LTIyLjEwNXoiLz48L3N2Zz4=" alt=""></div>';
+
+  const gap = 12;
+  const gunHalf = 64;
+  const GUN_BASE_ROT = 0; // 若沙鹰SVG枪口朝向相反，改为 180
+  const dist = halfSize + gunHalf + gap;
+  let rot = 0, dirX = 1, dirY = 0;
+
+  if (pos === 'top') { rot = -90; dirX = 0; dirY = -1; }
+  else if (pos === 'bottom') { rot = 90; dirX = 0; dirY = 1; }
+  else if (pos === 'left') { rot = 180; dirX = -1; dirY = 0; }
+  else { rot = 0; dirX = 1; dirY = 0; }
+
+  const gx = cx - dirX * dist;
+  const gy = cy - dirY * dist;
+  const mx = cx - dirX * (halfSize + gap);
+  const my = cy - dirY * (halfSize + gap);
+
+  gun.style.left = gx + 'px';
+  gun.style.top = gy + 'px';
+  gun.style.setProperty('--gun-base', GUN_BASE_ROT + 'deg');
+  gun.style.setProperty('--gun-rot', rot + 'deg');
+  gun.dataset.mx = mx;
+  gun.dataset.my = my;
+  gun.dataset.dirX = dirX;
+  gun.dataset.dirY = dirY;
+
+  document.body.appendChild(gun);
+  return gun;
+}
+
+function fireGun(gun) {
+  if (!gun) return;
+  gun.classList.add('recoil');
+  const mx = parseFloat(gun.dataset.mx);
+  const my = parseFloat(gun.dataset.my);
+  const flash = document.createElement('div');
+  flash.className = 'muzzle-flash flash';
+  flash.style.left = mx + 'px';
+  flash.style.top = my + 'px';
+  document.body.appendChild(flash);
+  setTimeout(() => flash.remove(), 250);
+}
+
+function showAvatarSymbol(type, player) {
+  const old = document.getElementById('centerSymbol');
+  if (old) old.remove();
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  const avatar = seat ? seat.querySelector('.avatar-box') : null;
+  const rect = avatar ? avatar.getBoundingClientRect()
+    : { left: window.innerWidth / 2 - 40, top: window.innerHeight / 2 - 40, width: 80, height: 80 };
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const size = Math.max(80, rect.width * 1.4);
+
+  const symbol = document.createElement('div');
+  symbol.id = 'centerSymbol';
+  symbol.className = 'center-symbol ' + type;
+  symbol.style.left = cx + 'px';
+  symbol.style.top = cy + 'px';
+  symbol.style.width = size + 'px';
+  symbol.style.height = size + 'px';
+  symbol.innerHTML = '<div class="symbol-icon" style="font-size:' + (size * 0.6) + 'px;">' + (type === 'shield' ? '🛡' : '☠') + '</div>';
+  document.body.appendChild(symbol);
+  setTimeout(() => { if (symbol.parentNode) symbol.remove(); }, 3000);
+}
+
+function triggerAvatarParticles(type, player) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return;
+  const avatar = seat.querySelector('.avatar-box');
+  const rect = avatar ? avatar.getBoundingClientRect() : seat.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const count = type === 'shield' ? 30 : 42;
+  const colors = type === 'shield'
+    ? ['#4ade80', '#22c55e', '#fbbf24', '#86efac']
+    : ['#ff4444', '#ff6666', '#7f1d1d', '#fbbf24', '#555'];
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = cx + 'px';
+    p.style.top = cy + 'px';
+    const size = 3 + Math.random() * 5;
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.boxShadow = '0 0 6px ' + p.style.background;
+
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 40 + Math.random() * (type === 'shield' ? 120 : 150);
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    p.animate([
+      { transform: 'translate(0,0) scale(1)', opacity: 1 },
+      { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.3)', opacity: 0 }
+    ], { duration: 700 + Math.random() * 700, easing: 'cubic-bezier(0.15,0.6,0.3,1)' });
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1500);
+  }
+}
+
+function triggerAvatarBlood(player) {
+  const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+  if (!seat) return;
+  const avatar = seat.querySelector('.avatar-box');
+  const rect = avatar ? avatar.getBoundingClientRect() : seat.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const colors = ['#ff4444', '#ff6666', '#cc0000', '#a01010'];
+  const start = Date.now();
+  const timer = setInterval(() => {
+    if (Date.now() - start > 3000) { clearInterval(timer); return; }
+    const n = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = cx + 'px';
+      p.style.top = cy + 'px';
+      const size = 3 + Math.random() * 5;
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.boxShadow = '0 0 6px ' + p.style.background;
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 30 + Math.random() * 90;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist + 60;
+      p.animate([
+        { transform: 'translate(0,0) scale(1)', opacity: 1 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.2)', opacity: 0 }
+      ], { duration: 600 + Math.random() * 500, easing: 'cubic-bezier(0.2,0.6,0.4,1)' });
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 1200);
+    }
+  }, 120);
+}
+
+function playPenaltySequence(player, isBullet) {
+  return new Promise(resolve => {
+    const gun = aimGunAt(player);
+    setTimeout(() => {
+      fireGun(gun);
+      showAvatarSymbol(isBullet ? 'skull' : 'shield', player);
+      triggerAvatarParticles(isBullet ? 'skull' : 'shield', player);
+      // 等护盾/骷髅与枪动画播放约 2s 后再弹出结算弹窗
+      setTimeout(() => { showPenaltyPopup(player, isBullet); }, 2000);
+
+      if (isBullet) {
+        triggerAvatarBlood(player); // 中弹：头像持续溅射红色粒子 3s
+        triggerScreenShake();
+        document.body.classList.add('bullet-time');
+        setTimeout(() => document.body.classList.remove('bullet-time'), 300);
+      } else {
+        const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
+        if (seat) {
+          seat.classList.add('flash-red');
+          setTimeout(() => seat.classList.remove('flash-red'), 400);
+        }
+      }
+
+      // 枪动画与盾牌/骷髅符号动画均播放完毕后再推进后续流程
+      setTimeout(() => {
+        if (gun && gun.parentNode) gun.remove();
+        resolve();
+      }, 3000);
+    }, 450);
+  });
+}
+
+function updateTension(delta) {
+  gameState.tension = Math.max(0, Math.min(100, gameState.tension + delta));
+  renderTension();
+}
+
+// ==================== 日志 ====================
+function addLog(text, type) {
+  const body = document.getElementById('logBody');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + (type || 'sys');
+  const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  entry.textContent = '[' + time + '] ' + text;
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
+  document.getElementById('logCount').textContent = body.children.length + '条';
+}
+
+// ==================== 游戏结束 ====================
+function spawnWinnerConfetti() {
+  const colors = ['#fbbf24', '#f59e0b', '#fde68a', '#ffffff', '#ef4444', '#34d399'];
+  const shapes = ['', 'border-radius:50%', 'transform:rotate(45deg)'];
+  for (let i = 0; i < 90; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti';
+    p.style.left = (Math.random() * 100) + 'vw';
+    p.style.top = (-10 - Math.random() * 40) + 'px';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.width = (6 + Math.random() * 8) + 'px';
+    p.style.height = (10 + Math.random() * 14) + 'px';
+    p.style.opacity = 0.8 + Math.random() * 0.2;
+    p.style.animationDelay = (Math.random() * 2.5) + 's';
+    p.style.animationDuration = (3 + Math.random() * 2) + 's';
+    const shape = shapes[Math.floor(Math.random() * shapes.length)];
+    if (shape) p.style.cssText += shape;
+    document.body.appendChild(p);
+    setTimeout(() => { if (p.parentNode) p.remove(); }, 6000);
+  }
+}
+
+function endGame(winner) {
+  gameState.gameOver = true;
+  const modal = document.getElementById('gameOverModal');
+  const box = document.getElementById('winnerModalBox');
+  const crown = document.getElementById('winnerCrown');
+  const avatarImg = document.getElementById('winnerAvatarImg');
+  const isWinner = winner && winner.alive;
+
+  box.classList.toggle('draw', !isWinner);
+  crown.textContent = isWinner ? '👑' : '💀';
+
+  if (isWinner) {
+    document.getElementById('gameOverTitle').textContent = winner.name + ' 获胜！';
+    const reason = winner.hand.length === 0 ? '率先清空手牌！' : '成为最后的幸存者！';
+    document.getElementById('gameOverText').textContent = '恭喜 ' + winner.name + ' ' + reason;
+    avatarImg.src = winner.avatar || '';
+    spawnWinnerConfetti();
+  } else {
+    document.getElementById('gameOverTitle').textContent = '全员淘汰';
+    document.getElementById('gameOverText').textContent = '所有人都在酒馆倒下了...';
+    avatarImg.src = '';
+  }
+
+  modal.classList.add('show');
+  renderSeats();
+  renderActions();
+}
+
+// ==================== AI配置 ====================
+function showRules() {
+  document.getElementById('rulesModal').classList.add('show');
+}
+function hideRulesModal() {
+  document.getElementById('rulesModal').classList.remove('show');
+}
+
+function showConfig() {
+  const cfg = gameState.config;
+  document.getElementById('cfgApiUrl').value = cfg.apiUrl || '';
+  document.getElementById('cfgModel').value = cfg.model || 'gpt-4';
+  document.getElementById('cfgApiKey').value = cfg.apiKey || '';
+  // 构建每个 AI 玩家的配置卡片
+  const list = document.getElementById('playerConfigList');
+  list.innerHTML = '';
+  gameState.players.filter(p => !p.isHuman).forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'player-card';
+    card.innerHTML =
+      '<div class="pc-head">' +
+        '<img class="pc-avatar" src="' + (p.avatar || '') + '" onerror="this.style.display=\'none\'">' +
+        '<input class="pc-name-input" id="pc_name_' + p.id + '" value="' + escapeAttr(p.name) + '" maxlength="12" placeholder="玩家名">' +
+      '</div>' +
+      '<div class="field"><label>性格 / 人设（写给 AI 的系统提示）</label>' +
+        '<textarea class="pc-persona" id="pc_persona_' + p.id + '">' + escapeHtml(p.personalityText || '') + '</textarea></div>' +
+      '<label class="own-api-toggle"><input type="checkbox" id="pc_own_' + p.id + '"' + (p.api.useOwn ? ' checked' : '') + ' onchange="toggleOwnApi(' + p.id + ')"> 使用独立 API</label>' +
+      '<div class="own-api-fields' + (p.api.useOwn ? ' show' : '') + '" id="pc_ownfields_' + p.id + '">' +
+        '<div class="field"><label>API 地址</label><input id="pc_apiurl_' + p.id + '" value="' + escapeAttr(p.api.apiUrl || '') + '" placeholder="https://.../chat/completions"></div>' +
+        '<div class="field"><label>模型名称</label><input id="pc_model_' + p.id + '" value="' + escapeAttr(p.api.model || '') + '" placeholder="gpt-4"></div>' +
+        '<div class="field"><label>API Key</label><input type="password" id="pc_key_' + p.id + '" value="' + escapeAttr(p.api.apiKey || '') + '" placeholder="sk-..."></div>' +
+      '</div>';
+    list.appendChild(card);
+  });
+  document.getElementById('configModal').classList.add('show');
+}
+function toggleOwnApi(id) {
+  const cb = document.getElementById('pc_own_' + id);
+  const fields = document.getElementById('pc_ownfields_' + id);
+  if (cb && fields) fields.classList.toggle('show', cb.checked);
+}
+function hideConfigModal() { document.getElementById('configModal').classList.remove('show'); }
+function saveConfig() {
+  gameState.config.apiUrl = document.getElementById('cfgApiUrl').value.trim();
+  gameState.config.model = document.getElementById('cfgModel').value.trim() || 'gpt-4';
+  gameState.config.apiKey = document.getElementById('cfgApiKey').value.trim();
+  gameState.players.filter(p => !p.isHuman).forEach(p => {
+    const nameEl = document.getElementById('pc_name_' + p.id);
+    const personaEl = document.getElementById('pc_persona_' + p.id);
+    const ownEl = document.getElementById('pc_own_' + p.id);
+    if (nameEl) p.name = nameEl.value.trim() || p.name;
+    if (personaEl) p.personalityText = personaEl.value.trim();
+    if (ownEl) {
+      p.api.useOwn = ownEl.checked;
+      p.api.apiUrl = (document.getElementById('pc_apiurl_' + p.id).value || '').trim();
+      p.api.model = (document.getElementById('pc_model_' + p.id).value || '').trim();
+      p.api.apiKey = (document.getElementById('pc_key_' + p.id).value || '').trim();
+    }
+    playerOverrides[p.id] = { name: p.name, personalityText: p.personalityText, api: p.api };
+  });
+  persistConfig();
+  hideConfigModal();
+  addLog('⚙️ AI 配置已保存', 'sys');
+  if (gameState.gameStarted) { renderSeats(); updateSideInfo(); }
+}
+async function testConnection() {
+  addLog('🔄 正在测试连接...', 'sys');
+  const text = await callAI({ api: { useOwn: false } }, '你是测试助手。', '只回复"OK"两个字。');
+  if (text) addLog('✅ 连接成功：' + text.slice(0, 24), 'good');
+  else addLog('❌ 连接失败（检查地址/Key/CORS/跨域）', 'bad');
+}
+
+// ==================== 配置持久化 ====================
+const CONFIG_STORE_KEY = 'theLiarAiConfig';
+function persistConfig() {
+  try {
+    const data = {
+      config: gameState.config,
+      overrides: playerOverrides
+    };
+    localStorage.setItem(CONFIG_STORE_KEY, JSON.stringify(data));
+  } catch (e) { /* 忽略（如隐私模式） */ }
+}
+function loadPersistedConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_STORE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.config) gameState.config = Object.assign({}, gameState.config, data.config);
+    if (data.overrides) playerOverrides = data.overrides || {};
+  } catch (e) { /* 忽略 */ }
+}
+
+// ==================== 工具函数 ====================
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ==================== 启动 ====================
+loadPersistedConfig();
+initGame();
+
+// 窗口大小变化时重绘箭头
+window.addEventListener('resize', () => {
+  if (gameState.gameStarted && !gameState.gameOver) {
+    renderSeats();
+  }
+});
+</script>
+</body>
+</html>
