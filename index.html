@@ -1576,12 +1576,13 @@ function startGame(mode) {
   gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
   addLog('🎯 目标牌：' + gameState.targetCard, 'sys');
   renderSeats();
-  renderHand(true);
+  const dealMs = renderHand(true);
   renderTarget();
   renderActions();
   renderTension();
   updateDisplay();
-  nextTurn();
+  // 等发牌铺开动画（约3s）播完，再开始玩家/AI 的思考与行动流程
+  setTimeout(() => nextTurn(), dealMs + 200);
 }
 
 function startRound() {
@@ -1598,11 +1599,12 @@ function startRound() {
   gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
   addLog('🎴 第' + gameState.roundCount + '轮开始！目标牌：' + gameState.targetCard, 'sys');
   renderPlayedCards();
-  renderHand(true);
+  const dealMs = renderHand(true);
   renderTarget();
   renderSeats();
   updateDisplay();
-  nextTurn();
+  // 等重发牌铺开动画（约3s）播完，再开始下一轮思考与行动流程
+  setTimeout(() => nextTurn(), dealMs + 200);
 }
 
 function nextTurn() {
@@ -2235,18 +2237,21 @@ function renderHand(isDeal) {
   const label = document.getElementById('handLabel');
   wrap.innerHTML = '';
   const human = gameState.players[0];
-  if (!gameState.gameStarted) { label.textContent = '等待游戏开始...'; return; }
-  if (gameState.gameOver) { label.textContent = '游戏结束'; return; }
-  if (!human.alive) { label.textContent = '你已淘汰'; return; }
+  if (!gameState.gameStarted) { label.textContent = '等待游戏开始...'; return 0; }
+  if (gameState.gameOver) { label.textContent = '游戏结束'; return 0; }
+  if (!human.alive) { label.textContent = '你已淘汰'; return 0; }
   label.textContent = '你的手牌 (' + human.hand.length + '张)' + (gameState.targetCard ? ' - 目标牌: ' + gameState.targetCard : '') + ':';
   const count = human.hand.length;
   const stepMs = count > 1 ? Math.round(3000 / count) : 0;
+  // 发牌动画总时长：最后一张的延迟 + 单张动画(0.5s)，用于让后续游戏流程等它播完
+  const dealDuration = isDeal && count > 0 ? (count - 1) * stepMs + 500 : 0;
   human.hand.forEach((card, i) => {
     const anim = isDeal
       ? { name: 'cardDeal', delay: i * stepMs }
       : { name: 'cardEnter' };
     wrap.appendChild(createCardElement(card, i, gameState.selectedCards.includes(i), anim));
   });
+  return dealDuration;
 }
 
 function createCardElement(card, index, isSelected, anim) {
