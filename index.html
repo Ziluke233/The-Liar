@@ -937,9 +937,13 @@ body {
   line-height: 1.3;
   max-width: 100%;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  cursor: default;
 }
+.side-info .side-sub::-webkit-scrollbar { display: none; }
 
 /* 按钮：悬浮弹出式，脱离文档流，不再挤压上方布局 */
 .actions {
@@ -1528,7 +1532,7 @@ body {
   .side-info .side-value { font-size: 18px; }
   .side-info .side-title { font-size: 10px; letter-spacing: 0; }
   .side-info .side-note, .side-info .side-sub { font-size: 9px; }
-  .side-info .side-sub { white-space: normal; line-height: 1.25; }
+  .side-info .side-sub { white-space: nowrap; line-height: 1.25; overflow-x: auto; }
 }
 
 </style>
@@ -1774,6 +1778,7 @@ let gameState = {
   currentPlayerIdx: 0,
   lastPlayerIdx: -1,
   lastPlayedCards: [],
+  pileCount: 0,
   roundCount: 0,
   gameStarted: false,
   gameOver: false,
@@ -1816,6 +1821,7 @@ function initGame() {
   gameState.currentPlayerIdx = Math.floor(Math.random() * MAX_PLAYERS);
   gameState.lastPlayerIdx = -1;
   gameState.lastPlayedCards = [];
+  gameState.pileCount = 0;
   gameState.roundCount = 0;
   gameState.gameStarted = false;
   gameState.gameOver = false;
@@ -1883,6 +1889,7 @@ function startRound() {
   if (gameState.gameOver) return;
   gameState.roundCount++;
   gameState.lastPlayedCards = [];
+  gameState.pileCount = 0;
   gameState.lastPlayerIdx = -1;
   gameState.humanPlayedThisTurn = false;
   gameState.awaitingChallenge = false;
@@ -2152,6 +2159,7 @@ function playCards(player, cards, isLying) {
     if (idx > -1) player.hand.splice(idx, 1);
   });
   gameState.lastPlayedCards = [...cards];
+  gameState.pileCount += cards.length;
   gameState.lastPlayerIdx = player.id;
   player.lastLied = isLying;
   addLog('🃏 【' + player.name + '】打出 ' + cards.length + ' 张牌 (宣称是 ' + gameState.targetCard + ')', 'act');
@@ -2709,7 +2717,7 @@ function updateSideInfo() {
   gunInfo.style.opacity = '1';
 
   // 左侧：场上宣称的目标牌数 / 本局目标牌总数
-  const claimed = gameState.lastPlayedCards ? gameState.lastPlayedCards.length : 0;
+  const claimed = gameState.pileCount || 0;
   const targetTotal = gameState.targetCard ? 6 : 0; // 每轮 Q/K/A 各 6 张
   document.getElementById('claimedCount').textContent = claimed;
   targetInfo.querySelector('.side-total').textContent = '/' + targetTotal;
