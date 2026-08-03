@@ -1309,13 +1309,22 @@ function performPenalty(player) {
   player.bulletsFired++;
 
   // 弹出醒目的惩罚结果提示
-  showPenaltyPopup(player, isBullet);
+  try {
+    showPenaltyPopup(player, isBullet);
+  } catch (error) {
+    console.error('showPenaltyPopup failed:', error);
+  }
 
   if (isBullet) {
     addLog('💥 砰！' + player.name + '中弹了！', 'bad');
     // 实弹：直接淘汰
     player.hp = 0;
-    triggerDeathEffects(player);
+    player.alive = false;
+    try {
+      triggerDeathEffects(player);
+    } catch (error) {
+      console.error('triggerDeathEffects failed:', error);
+    }
   } else {
     addLog('🔘 咔...' + player.name + '安全', 'sys');
     // 空弹：不扣HP，只推进弹舱指针（currentBullet已+1）
@@ -1324,11 +1333,14 @@ function performPenalty(player) {
       seat.classList.add('flash-red');
       setTimeout(() => seat.classList.remove('flash-red'), 400);
     }
-    triggerParticles(player, 8);
+    try {
+      triggerParticles(player, 8);
+    } catch (error) {
+      console.error('triggerParticles failed:', error);
+    }
   }
 
   if (player.hp <= 0) {
-    player.alive = false;
     const dialogue = getDialogue(player, 'death');
     showBubble(player, dialogue);
     addLog('💀 【' + player.name + '】淘汰！"' + dialogue + '"', 'bad');
