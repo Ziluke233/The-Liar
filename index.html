@@ -1135,6 +1135,23 @@ body {
   font-size: 13px;
 }
 .modal .field input:focus { outline: none; border-color: var(--accent-gold); }
+.modal .field textarea.pc-persona { width: 100%; min-height: 56px; resize: vertical; padding: 8px 10px; background: var(--bg-panel); border: 1px solid var(--border-gold); border-radius: 6px; color: var(--text-primary); font-size: 12px; line-height: 1.5; font-family: var(--font-main); }
+.modal .field textarea.pc-persona:focus { outline: none; border-color: var(--accent-gold); }
+
+/* AI设置：可滚动大弹窗 */
+.config-modal { width: min(580px, 94%); max-height: 88vh; overflow-y: auto; }
+.config-section { border-top: 1px dashed var(--border-gold); padding-top: 14px; margin-top: 14px; }
+.config-section > .sec-title { font-size: 13px; color: var(--accent-gold); margin-bottom: 8px; font-weight: bold; }
+.config-hint { font-size: 11px; color: var(--text-dim); line-height: 1.6; margin-top: 10px; }
+.player-card { background: var(--bg-card); border: 1px solid var(--border-gold); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+.player-card .pc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.player-card .pc-avatar { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-gold); object-fit: cover; }
+.player-card .pc-name-input { flex: 1; padding: 6px 10px; background: var(--bg-panel); border: 1px solid var(--border-gold); border-radius: 6px; color: var(--text-primary); font-size: 13px; }
+.player-card .pc-name-input:focus { outline: none; border-color: var(--accent-gold); }
+.own-api-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); margin: 8px 0 4px; cursor: pointer; }
+.own-api-toggle input { width: 14px; height: 14px; accent-color: var(--accent-gold); }
+.own-api-fields { display: none; margin-top: 6px; }
+.own-api-fields.show { display: block; }
 .modal .close-x { position: absolute; top: 12px; right: 16px; font-size: 24px; color: var(--text-dim); cursor: pointer; background: none; border: none; }
 .modal .close-x:hover { color: var(--accent-gold); }
 
@@ -1752,17 +1769,25 @@ body {
 
 <!-- AI配置 -->
 <div class="modal-overlay" id="configModal">
-  <div class="modal">
+  <div class="modal config-modal">
     <button class="close-x" onclick="hideConfigModal()">&times;</button>
-    <h2>AI 模型配置</h2>
-    <div class="field"><label>API 地址 (OpenAI兼容)</label><input type="text" id="cfgApiUrl" placeholder="https://api.openai.com/v1/chat/completions"></div>
-    <div class="field"><label>模型名称</label><input type="text" id="cfgModel" placeholder="gpt-4" value="gpt-4"></div>
-    <div class="field"><label>API Key</label><input type="password" id="cfgApiKey" placeholder="sk-..."></div>
-    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+    <h2>AI 设置</h2>
+    <div class="config-section">
+      <div class="sec-title">🌐 总 API（默认，未单独设置者均调用此）</div>
+      <div class="field"><label>API 地址 (OpenAI 兼容)</label><input type="text" id="cfgApiUrl" placeholder="https://api.openai.com/v1/chat/completions"></div>
+      <div class="field"><label>模型名称</label><input type="text" id="cfgModel" placeholder="gpt-4"></div>
+      <div class="field"><label>API Key</label><input type="password" id="cfgApiKey" placeholder="sk-..."></div>
+    </div>
+    <div class="config-section">
+      <div class="sec-title">🤖 人机玩家（名字 / 性格人设 / 独立 API）</div>
+      <div id="playerConfigList"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn-gold" onclick="saveConfig()">保存</button>
       <button class="btn btn-red" onclick="testConnection()">测试连接</button>
       <button class="btn" style="border-color:var(--text-dim);color:var(--text-dim)" onclick="hideConfigModal()">关闭</button>
     </div>
+    <p class="config-hint">提示：所有配置仅保存在你的浏览器本地（localStorage），不会上传到任何服务器。若你的 API 端点不支持跨域(CORS)，需在 API 侧开启 CORS 或用本地代理转发。</p>
   </div>
 </div>
 
@@ -1855,17 +1880,28 @@ let gameState = {
   config: { apiUrl: '', model: 'gpt-4', apiKey: '' }
 };
 
+const PERSONA_DEFAULTS = {
+  aggressive: '你性格激进好斗、爱拱火挑衅，说话冲、带痞气，喜欢虚张声势、激别人来质疑你。',
+  analytical: '你性格冷静理性，爱用概率和逻辑推理，说话有条理，会分析别人出牌是否合理。',
+  timid: '你性格胆小谨慎、容易紧张，说话支支吾吾、不自信，不太敢质疑别人，怕被针对。'
+};
+
 const PLAYER_CONFIGS = [
-  { id: 0, name: '你', avatar: 'assets/player1_gaming.svg', isHuman: true, seatPos: 'bottom', personality: 'human' },
-  { id: 1, name: 'Gamer', avatar: 'assets/player2_professor.svg', isHuman: false, seatPos: 'left', personality: 'aggressive' },
-  { id: 2, name: 'Professor', avatar: 'assets/player3_coolgirl.svg', isHuman: false, seatPos: 'top', personality: 'analytical' },
-  { id: 3, name: 'Cool Girl', avatar: 'assets/player4_shyguy.svg', isHuman: false, seatPos: 'right', personality: 'timid' }
+  { id: 0, name: '你', avatar: 'assets/player1_gaming.svg', isHuman: true, seatPos: 'bottom', personality: 'human', personalityText: '', api: { useOwn: false, apiUrl: '', model: '', apiKey: '' } },
+  { id: 1, name: 'Gamer', avatar: 'assets/player2_professor.svg', isHuman: false, seatPos: 'left', personality: 'aggressive', personalityText: PERSONA_DEFAULTS.aggressive, api: { useOwn: false, apiUrl: '', model: '', apiKey: '' } },
+  { id: 2, name: 'Professor', avatar: 'assets/player3_coolgirl.svg', isHuman: false, seatPos: 'top', personality: 'analytical', personalityText: PERSONA_DEFAULTS.analytical, api: { useOwn: false, apiUrl: '', model: '', apiKey: '' } },
+  { id: 3, name: 'Cool Girl', avatar: 'assets/player4_shyguy.svg', isHuman: false, seatPos: 'right', personality: 'timid', personalityText: PERSONA_DEFAULTS.timid, api: { useOwn: false, apiUrl: '', model: '', apiKey: '' } }
 ];
+
+// 持久化的玩家覆盖（姓名/性格/独立API），跨重开保留
+let playerOverrides = {};
 
 // ==================== 初始化 ====================
 function initGame() {
   gameState.players = PLAYER_CONFIGS.map(cfg => ({
     ...cfg,
+    personalityText: cfg.personalityText,
+    api: JSON.parse(JSON.stringify(cfg.api)),
     hp: MAX_HP,
     alive: true,
     hand: [],
@@ -1876,6 +1912,15 @@ function initGame() {
     caughtLying: false,
     difficulty: cfg.id === 1 ? 'medium' : cfg.id === 2 ? 'hard' : 'easy'
   }));
+  // 应用持久化覆盖（用户自定义的名字/性格/独立API）
+  Object.keys(playerOverrides).forEach(id => {
+    const o = playerOverrides[id];
+    const p = gameState.players.find(x => x.id === Number(id));
+    if (!p) return;
+    if (o.name) p.name = o.name;
+    if (typeof o.personalityText === 'string') p.personalityText = o.personalityText;
+    if (o.api) p.api = o.api;
+  });
   gameState.players.forEach(p => {
     gameState.players.forEach(o => { if (o.id !== p.id) p.trustLevels[o.name] = 50; });
   });
@@ -2012,15 +2057,11 @@ async function aiTurn(player) {
   showBubble(player, '思考中', 'thinking');
   addLog('🤖 【' + player.name + '】正在思考...', 'sys');
 
-  // 思考至少5秒（5000-6500ms随机，更自然）
-  await wait(5000 + Math.random() * 1500);
-
-  if (gameState.gameOver) return;
-
-  const dialogue = getDialogue(player, 'play');
-  showBubble(player, dialogue);
-  addLog('💬 【' + player.name + '】"' + dialogue + '"', 'dia');
-  await wait(600);
+  // 思考等待：内置模式长一点更自然；AI模式让LLM调用填充时间
+  const thinkMs = gameState.gameMode === 'ai'
+    ? 1200 + Math.random() * 900
+    : 5000 + Math.random() * 1500;
+  await wait(thinkMs);
 
   if (gameState.gameOver) return;
 
@@ -2065,6 +2106,12 @@ async function aiTurn(player) {
     chosen = [hand[0]];
     isLying = hand[0] !== target && hand[0] !== 'Joker';
   }
+
+  // 出牌前表态（性格化、由LLM生成；无API时回退内置语料）
+  const playLine = await getAIBubble(player, 'play', { count: chosen.length });
+  showBubble(player, playLine);
+  addLog('💬 【' + player.name + '】"' + playLine.replace(/\n/g, ' ') + '"', 'dia');
+  await wait(500);
 
   // 飞行动画：从AI头像飞向桌面（AI出牌显示牌背）
   animateCardsFromPlayer(player, chosen, () => {
@@ -2111,11 +2158,15 @@ function beginChallengeAfterPlay(playedBy, cards, isLying) {
   }
 
   if (playedBy.isHuman) showReactionModal();
+  // 触发其他存活AI对这次出牌的发言（拱火/推理），错峰显示在气泡中
+  triggerBanter(playedBy, cards.length);
+  const baseDelay = playedBy.isHuman ? 2000 : 3000;
+  const extra = gameState.gameMode === 'ai' ? 1600 : 0;
   setTimeout(() => {
     if (gameState.gameOver) return;
     if (playedBy.isHuman) hideReactionModal();
     aiChallengeDecision(nextPlayer, playedBy, cards, isLying, forcedChallenge);
-  }, playedBy.isHuman ? 2000 : 3000);
+  }, baseDelay + extra);
 }
 
 // ==================== 出牌动画 ====================
@@ -2244,7 +2295,7 @@ function playCards(player, cards, isLying) {
 }
 
 // ==================== 质疑 ====================
-function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChallenge = false) {
+async function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChallenge = false) {
   if (gameState.gameOver) return;
   let shouldChallenge = forceChallenge;
   const trust = challenger.trustLevels[targetPlayer.name] || 50;
@@ -2264,10 +2315,10 @@ function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChal
   if (forceChallenge) shouldChallenge = true;
 
   if (shouldChallenge) {
-    const dialogue = getDialogue(challenger, 'challenge');
+    const dialogue = await getAIBubble(challenger, 'challenge', { actorName: targetPlayer.name, count: cards.length });
     showBubble(challenger, '质疑!', 'challenge');
     showNotice(challenger.name + ' 质疑!', 'challenge');
-    addLog('⚡ 【' + challenger.name + '】质疑！"' + dialogue + '"', 'chal');
+    addLog('⚡ 【' + challenger.name + '】质疑！"' + dialogue.replace(/\n/g, ' ') + '"', 'chal');
     gameState.awaitingChallenge = false;
     setTimeout(() => {
       if (!gameState.gameOver) {
@@ -2275,9 +2326,9 @@ function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChal
       }
     }, 600);
   } else {
-    const dialogue = getDialogue(challenger, 'pass');
+    const dialogue = await getAIBubble(challenger, 'pass', { actorName: targetPlayer.name });
     showNotice(challenger.name + ' 不质疑', 'pass');
-    addLog('💬 【' + challenger.name + '】"' + dialogue + '" (选择不质疑)', 'dia');
+    addLog('💬 【' + challenger.name + '】"' + dialogue.replace(/\n/g, ' ') + '" (选择不质疑)', 'dia');
     gameState.lastPlayerIdx = -1; // 清除质疑状态
     gameState.awaitingChallenge = false;
     gameState.forcedChallenge = false;
@@ -2819,7 +2870,10 @@ function showBubble(player, text, type) {
   if (type === 'thinking') {
     bubble.innerHTML = '<span class="thinking-dots">思考中<span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
   } else {
-    bubble.textContent = text;
+    // 支持多行（LLM 返回的若干短句）：转义后换行转 <br>
+    const esc = document.createElement('div');
+    esc.textContent = text;
+    bubble.innerHTML = esc.innerHTML.replace(/\n/g, '<br>');
   }
   document.body.appendChild(bubble);
 
@@ -2892,6 +2946,110 @@ function getDialogue(player, situation) {
   const pool = DIALOGUE_POOL[player.personality] || {};
   const lines = pool[situation] || ['...'];
   return lines[Math.floor(Math.random() * lines.length)];
+}
+
+// ==================== LLM 接入 ====================
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+
+// 调用 OpenAI 兼容接口。优先使用玩家独立API，否则用总API。
+// 返回文本字符串，失败/超时/未配置返回 null。
+async function callAI(player, systemPrompt, userPrompt) {
+  const useOwn = player && player.api && player.api.useOwn && player.api.apiUrl;
+  const cfg = useOwn
+    ? { apiUrl: player.api.apiUrl, model: player.api.model, apiKey: player.api.apiKey }
+    : gameState.config;
+  const apiUrl = (cfg.apiUrl || '').trim();
+  const apiKey = (cfg.apiKey || '').trim();
+  const model = (cfg.model || 'gpt-4').trim();
+  if (!apiUrl) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 9000);
+  try {
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'Authorization': 'Bearer ' + apiKey } : {})
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.9,
+        max_tokens: 240
+      }),
+      signal: controller.signal
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const text = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    return text ? text.trim() : null;
+  } catch (e) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 取得某 AI 玩家的发言。无 API / 非 ai 模式时回退到内置语料。
+// situation: 'banter'（对出牌的反应）| 'play'（出牌前表态）| 'challenge' | 'pass'
+async function getAIBubble(player, situation, extra) {
+  extra = extra || {};
+  if (gameState.gameMode !== 'ai') return getDialogue(player, situation);
+
+  const target = gameState.targetCard;
+  const round = gameState.roundCount;
+  const aliveNames = gameState.players.filter(p => p.alive).map(p => p.name).join('、');
+  const ownHand = player.hand.map(c => {
+    if (c === 'Joker') return 'Joker(万能)';
+    if (c === target) return c + '(目标)';
+    return c;
+  }).join('、');
+
+  const baseSystem =
+    '你是名为「' + player.name + '」的玩家，正在玩《骗子酒馆》卡牌游戏。' + (player.personalityText || '') +
+    '\n规则：每轮从Q/K/A中随机一张作为目标牌，玩家轮流出牌并宣称打出的都是目标牌（牌背朝上，别的玩家看不到真伪）。下一位玩家可选择质疑或相信。' +
+    '\n严格限制：你【只能】知道【你自己】的手牌，绝对不能知道其他任何玩家的手牌，也不能知道别人是否说谎。你只能依据公开信息和推理来发言。' +
+    '\n发言要求：用中文、口语化、贴合你的性格；说1到5句，每句简短（最好不超过20字）；可以拱火、挑衅、分析推理或装无辜，但绝不要暴露你知道别人的牌。直接输出句子，用换行分隔，不要加引号或"我说："之类前缀。';
+
+  let userPrompt = '';
+  if (situation === 'banter') {
+    userPrompt = '公开信息：本轮目标牌是' + target + '，第' + round + '轮，存活玩家：' + aliveNames + '。\n刚才【' + (extra.actorName || '某人') + '】打出了' + (extra.count || '?') + '张牌，宣称是目标牌（你不知真假）。\n你自己的手牌：' + ownHand + '。\n请对这次出牌发表你的反应（怀疑、拱火、分析或装怂均可），1到5句。';
+  } else if (situation === 'play') {
+    userPrompt = '轮到你出牌。公开信息：目标牌' + target + '，第' + round + '轮。你手牌：' + ownHand + '。你准备打出' + (extra.count || 1) + '张并宣称是目标牌。用你的性格说一句出牌前的表态（1到2句，简短）。';
+  } else if (situation === 'challenge') {
+    userPrompt = '上家【' + (extra.actorName || '某人') + '】打出' + (extra.count || '?') + '张并宣称是目标牌。轮到你决定是否质疑。用你的性格说一句（质疑就挑衅地质疑，不质疑就装作相信），1到2句简短。';
+  } else if (situation === 'pass') {
+    userPrompt = '你决定不质疑上家【' + (extra.actorName || '某人') + '】。用你的性格说一句（装作相信或留待观察），1到2句简短。';
+  } else {
+    return getDialogue(player, situation);
+  }
+
+  const text = await callAI(player, baseSystem, userPrompt);
+  if (text) return text;
+  return getDialogue(player, situation === 'banter' ? 'play' : situation);
+}
+
+// 某人出牌后，其他存活 AI 各自发表 1~5 句短评（错峰显示）
+async function triggerBanter(actor, count) {
+  if (gameState.gameMode !== 'ai' || gameState.gameOver) return;
+  const reactors = gameState.players.filter(p => p.alive && !p.isHuman && p.id !== actor.id);
+  if (reactors.length === 0) return;
+  const jobs = reactors.map(p => getAIBubble(p, 'banter', { actorName: actor.name, count })
+    .then(text => ({ p, text }))
+    .catch(() => ({ p, text: null })));
+  const results = await Promise.all(jobs);
+  results.forEach((r, i) => {
+    if (r.text) {
+      setTimeout(() => { if (!gameState.gameOver) showBubble(r.p, r.text); }, 500 + i * 700);
+    }
+  });
 }
 
 // ==================== 惩罚结果弹窗 ====================
@@ -3333,24 +3491,91 @@ function showConfig() {
   document.getElementById('cfgApiUrl').value = cfg.apiUrl || '';
   document.getElementById('cfgModel').value = cfg.model || 'gpt-4';
   document.getElementById('cfgApiKey').value = cfg.apiKey || '';
+  // 构建每个 AI 玩家的配置卡片
+  const list = document.getElementById('playerConfigList');
+  list.innerHTML = '';
+  gameState.players.filter(p => !p.isHuman).forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'player-card';
+    card.innerHTML =
+      '<div class="pc-head">' +
+        '<img class="pc-avatar" src="' + (p.avatar || '') + '" onerror="this.style.display=\'none\'">' +
+        '<input class="pc-name-input" id="pc_name_' + p.id + '" value="' + escapeAttr(p.name) + '" maxlength="12" placeholder="玩家名">' +
+      '</div>' +
+      '<div class="field"><label>性格 / 人设（写给 AI 的系统提示）</label>' +
+        '<textarea class="pc-persona" id="pc_persona_' + p.id + '">' + escapeHtml(p.personalityText || '') + '</textarea></div>' +
+      '<label class="own-api-toggle"><input type="checkbox" id="pc_own_' + p.id + '"' + (p.api.useOwn ? ' checked' : '') + ' onchange="toggleOwnApi(' + p.id + ')"> 使用独立 API</label>' +
+      '<div class="own-api-fields' + (p.api.useOwn ? ' show' : '') + '" id="pc_ownfields_' + p.id + '">' +
+        '<div class="field"><label>API 地址</label><input id="pc_apiurl_' + p.id + '" value="' + escapeAttr(p.api.apiUrl || '') + '" placeholder="https://.../chat/completions"></div>' +
+        '<div class="field"><label>模型名称</label><input id="pc_model_' + p.id + '" value="' + escapeAttr(p.api.model || '') + '" placeholder="gpt-4"></div>' +
+        '<div class="field"><label>API Key</label><input type="password" id="pc_key_' + p.id + '" value="' + escapeAttr(p.api.apiKey || '') + '" placeholder="sk-..."></div>' +
+      '</div>';
+    list.appendChild(card);
+  });
   document.getElementById('configModal').classList.add('show');
+}
+function toggleOwnApi(id) {
+  const cb = document.getElementById('pc_own_' + id);
+  const fields = document.getElementById('pc_ownfields_' + id);
+  if (cb && fields) fields.classList.toggle('show', cb.checked);
 }
 function hideConfigModal() { document.getElementById('configModal').classList.remove('show'); }
 function saveConfig() {
   gameState.config.apiUrl = document.getElementById('cfgApiUrl').value.trim();
-  gameState.config.model = document.getElementById('cfgModel').value.trim();
+  gameState.config.model = document.getElementById('cfgModel').value.trim() || 'gpt-4';
   gameState.config.apiKey = document.getElementById('cfgApiKey').value.trim();
+  gameState.players.filter(p => !p.isHuman).forEach(p => {
+    const nameEl = document.getElementById('pc_name_' + p.id);
+    const personaEl = document.getElementById('pc_persona_' + p.id);
+    const ownEl = document.getElementById('pc_own_' + p.id);
+    if (nameEl) p.name = nameEl.value.trim() || p.name;
+    if (personaEl) p.personalityText = personaEl.value.trim();
+    if (ownEl) {
+      p.api.useOwn = ownEl.checked;
+      p.api.apiUrl = (document.getElementById('pc_apiurl_' + p.id).value || '').trim();
+      p.api.model = (document.getElementById('pc_model_' + p.id).value || '').trim();
+      p.api.apiKey = (document.getElementById('pc_key_' + p.id).value || '').trim();
+    }
+    playerOverrides[p.id] = { name: p.name, personalityText: p.personalityText, api: p.api };
+  });
+  persistConfig();
   hideConfigModal();
-  addLog('⚙️ AI配置已保存', 'sys');
+  addLog('⚙️ AI 配置已保存', 'sys');
+  if (gameState.gameStarted) { renderSeats(); updateSideInfo(); }
 }
-function testConnection() {
-  addLog('🔄 测试连接... (功能预留)', 'sys');
+async function testConnection() {
+  addLog('🔄 正在测试连接...', 'sys');
+  const text = await callAI({ api: { useOwn: false } }, '你是测试助手。', '只回复"OK"两个字。');
+  if (text) addLog('✅ 连接成功：' + text.slice(0, 24), 'good');
+  else addLog('❌ 连接失败（检查地址/Key/CORS/跨域）', 'bad');
+}
+
+// ==================== 配置持久化 ====================
+const CONFIG_STORE_KEY = 'theLiarAiConfig';
+function persistConfig() {
+  try {
+    const data = {
+      config: gameState.config,
+      overrides: playerOverrides
+    };
+    localStorage.setItem(CONFIG_STORE_KEY, JSON.stringify(data));
+  } catch (e) { /* 忽略（如隐私模式） */ }
+}
+function loadPersistedConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_STORE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.config) gameState.config = Object.assign({}, gameState.config, data.config);
+    if (data.overrides) playerOverrides = data.overrides || {};
+  } catch (e) { /* 忽略 */ }
 }
 
 // ==================== 工具函数 ====================
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ==================== 启动 ====================
+loadPersistedConfig();
 initGame();
 
 // 窗口大小变化时重绘箭头
