@@ -2964,8 +2964,9 @@ async function callAI(player, systemPrompt, userPrompt) {
   const apiUrl = (cfg.apiUrl || '').trim();
   const apiKey = (cfg.apiKey || '').trim();
   const model = (cfg.model || 'gpt-4').trim();
-  if (!apiUrl) return null;
+  if (!apiUrl) { window.__lastAIError = '未填写 API 地址'; return null; }
 
+  let lastErr = '未知错误';
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
   try {
@@ -2986,11 +2987,19 @@ async function callAI(player, systemPrompt, userPrompt) {
       }),
       signal: controller.signal
     });
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      lastErr = 'HTTP ' + resp.status + ' ' + resp.statusText;
+      try { const tb = await resp.text(); lastErr += ' | ' + tb.slice(0, 160); } catch (_) {}
+      window.__lastAIError = lastErr;
+      return null;
+    }
     const data = await resp.json();
     const text = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    return text ? text.trim() : null;
+    if (!text) { lastErr = '响应格式异常(无 choices[0].message.content)，可能非 OpenAI 兼容接口'; window.__lastAIError = lastErr; return null; }
+    return text.trim();
   } catch (e) {
+    lastErr = (e && e.name === 'AbortError') ? '请求超时(9秒未响应)' : ('网络/跨域(CORS)错误: ' + (e && e.message ? e.message : e));
+    window.__lastAIError = lastErr;
     return null;
   } finally {
     clearTimeout(timer);
@@ -3547,7 +3556,7 @@ async function testConnection() {
   addLog('🔄 正在测试连接...', 'sys');
   const text = await callAI({ api: { useOwn: false } }, '你是测试助手。', '只回复"OK"两个字。');
   if (text) addLog('✅ 连接成功：' + text.slice(0, 24), 'good');
-  else addLog('❌ 连接失败（检查地址/Key/CORS/跨域）', 'bad');
+  else addLog('❌ 连接失败：' + (window.__lastAIError || '未知错误（检查地址/Key）'), 'bad');
 }
 
 // ==================== 配置持久化 ====================
