@@ -1804,8 +1804,8 @@ body {
     <h2>AI 设置</h2>
     <div class="config-section">
       <div class="sec-title">🌐 总 API（默认，未单独设置者均调用此）</div>
-      <div class="field"><label>API 地址 (OpenAI 兼容)</label><input type="text" id="cfgApiUrl" placeholder="https://api.openai.com/v1/chat/completions"></div>
-      <div class="field"><label>模型名称</label><input type="text" id="cfgModel" placeholder="gpt-4"></div>
+      <div class="field"><label>API 地址 (OpenAI 兼容)</label><input type="text" id="cfgApiUrl" placeholder="https://api.deepseek.com/v1/chat/completions"></div>
+      <div class="field"><label>模型名称</label><input type="text" id="cfgModel" placeholder="deepseek-v4-flash"></div>
       <div class="field"><label>API Key</label><input type="password" id="cfgApiKey" placeholder="sk-..."></div>
     </div>
     <div class="config-section">
@@ -1907,7 +1907,7 @@ let gameState = {
   selectedCards: [],
   tension: 0,
   gameMode: 'builtin',
-  config: { apiUrl: '', model: 'gpt-4', apiKey: '' }
+  config: { apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash', apiKey: '' }
 };
 
 const PERSONA_DEFAULTS = {
@@ -1932,15 +1932,15 @@ let pendingGameMode = null;
 // 是否已配置可用的 LLM 接口（总接口或任一玩家独立接口）
 function isLLMConfigured() {
   const c = gameState.config;
-  if (c && c.apiUrl && c.apiUrl.trim()) return true;
-  return gameState.players.some(p => p.api && p.api.useOwn && p.api.apiUrl && p.api.apiUrl.trim());
+  if (c && c.apiUrl && c.apiUrl.trim() && c.apiKey && c.apiKey.trim()) return true;
+  return gameState.players.some(p => p.api && p.api.useOwn && p.api.apiUrl && p.api.apiUrl.trim() && p.api.apiKey && p.api.apiKey.trim());
 }
-// 当前玩家是否可用 LLM（AI 模式下且有可用接口）
+// 当前玩家是否可用 LLM（AI 模式下且有可用接口 + 密钥）
 function isLLMUsable(player) {
   if (gameState.gameMode !== 'ai') return false;
   const c = gameState.config;
-  if (c && c.apiUrl && c.apiUrl.trim()) return true;
-  return !!(player && player.api && player.api.useOwn && player.api.apiUrl && player.api.apiUrl.trim());
+  if (c && c.apiUrl && c.apiUrl.trim() && c.apiKey && c.apiKey.trim()) return true;
+  return !!(player && player.api && player.api.useOwn && player.api.apiUrl && player.api.apiUrl.trim() && player.api.apiKey && player.api.apiKey.trim());
 }
 
 // ==================== 音频系统（WebAudio 合成，无需外部文件） ====================
@@ -3830,8 +3830,8 @@ document.addEventListener('click', function (e) {
 
 function showConfig() {
   const cfg = gameState.config;
-  document.getElementById('cfgApiUrl').value = cfg.apiUrl || '';
-  document.getElementById('cfgModel').value = cfg.model || 'gpt-4';
+  document.getElementById('cfgApiUrl').value = cfg.apiUrl || 'https://api.deepseek.com/v1/chat/completions';
+  document.getElementById('cfgModel').value = cfg.model || 'deepseek-v4-flash';
   document.getElementById('cfgApiKey').value = cfg.apiKey || '';
   // 构建每个 AI 玩家的配置卡片
   const list = document.getElementById('playerConfigList');
@@ -3863,8 +3863,8 @@ function toggleOwnApi(id) {
 }
 function hideConfigModal() { document.getElementById('configModal').classList.remove('show'); }
 function saveConfig() {
-  gameState.config.apiUrl = document.getElementById('cfgApiUrl').value.trim();
-  gameState.config.model = document.getElementById('cfgModel').value.trim() || 'gpt-4';
+  gameState.config.apiUrl = document.getElementById('cfgApiUrl').value.trim() || 'https://api.deepseek.com/v1/chat/completions';
+  gameState.config.model = document.getElementById('cfgModel').value.trim() || 'deepseek-v4-flash';
   gameState.config.apiKey = document.getElementById('cfgApiKey').value.trim();
   gameState.players.filter(p => !p.isHuman).forEach(p => {
     const nameEl = document.getElementById('pc_name_' + p.id);
