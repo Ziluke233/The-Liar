@@ -53,6 +53,22 @@ body {
   flex-shrink: 0;
 }
 .top-btn.muted { opacity: 0.5; }
+.audio-wrap { position: relative; display: inline-block; }
+.audio-panel {
+  position: absolute; top: 100%; right: 0; margin-top: 6px;
+  background: linear-gradient(180deg, #262019, #15110c);
+  border: 1px solid var(--border-gold); border-radius: 10px;
+  padding: 10px 12px; min-width: 172px; z-index: 1000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .55);
+}
+.audio-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 2px; }
+.audio-row span { color: #e9d5b0; font-size: 13px; }
+.audio-switch {
+  border: 1px solid var(--border-gold); background: #3b2f23; color: #e9d5b0;
+  border-radius: 14px; padding: 3px 12px; font-size: 12px; cursor: pointer; min-width: 44px;
+}
+.audio-switch.on { background: #2f7d4f; border-color: #3fb56f; color: #fff; }
+.audio-switch.off { background: #5b2b2b; border-color: #a14b4b; color: #ffd9d9; }
 .game-title {
   font-family: var(--font-main);
   font-size: 26px;
@@ -1634,7 +1650,19 @@ body {
     <span id="lastPlayCount" style="display:none">上家出 <strong id="lastPlayValue">0</strong>张</span>
     <button class="top-btn" onclick="showRules()">规则</button>
     <button class="top-btn" onclick="showConfig()">AI设置</button>
-    <button class="top-btn" id="audioToggle" onclick="toggleAudio()" title="背景音乐/音效开关">🔊 音效</button>
+    <div class="audio-wrap">
+      <button class="top-btn" id="audioToggle" onclick="toggleAudioPanel()" title="音频设置">🔊 音频</button>
+      <div class="audio-panel" id="audioPanel" style="display:none">
+        <div class="audio-row">
+          <span>🎵 背景音乐</span>
+          <button class="audio-switch on" id="bgmSwitch" onclick="toggleBgm()">开</button>
+        </div>
+        <div class="audio-row">
+          <span>🔊 音效</span>
+          <button class="audio-switch on" id="sfxSwitch" onclick="toggleSfx()">开</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1919,6 +1947,7 @@ function isLLMUsable(player) {
 // 提供：背景音乐(循环柔和琶音+铺底)、开枪/子弹命中/盾牌/出牌/质疑 等音效；右上角可静音。
 const AudioSys = (function () {
   let ctx = null, master = null, bgmGain = null, bgmNodes = [], bgmTimer = null, bgmOn = false, muted = false;
+  let bgmEnabled = true, sfxEnabled = true, bgmBar = 0;
   function ensureCtx() {
     if (ctx) return true;
     try {
@@ -1968,52 +1997,90 @@ const AudioSys = (function () {
   function sfxShield() { if (!ctx) return; resume(); tone(660, 0, 0.16, 'sine', 0.35); tone(880, 0.07, 0.22, 'sine', 0.3); tone(1320, 0.15, 0.26, 'sine', 0.2); }
   function sfxCard() { if (!ctx) return; resume(); noise(0, 0.07, 0.18, 3500, 'highpass'); tone(320, 0, 0.05, 'triangle', 0.12); }
   function sfxChallenge() { if (!ctx) return; resume(); tone(520, 0, 0.12, 'square', 0.25); tone(780, 0.09, 0.15, 'square', 0.2); }
+  function sfxWin() {
+    if (!ctx) return; resume();
+    // 上行号角 + 闪光 + 终止和弦（大调凯旋感）
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((f, i) => {
+      tone(f, i * 0.13, 0.55, 'triangle', 0.4);
+      tone(f * 2, i * 0.13, 0.28, 'sine', 0.12);
+    });
+    [523.25, 659.25, 783.99].forEach(f => tone(f, 0.55, 0.9, 'triangle', 0.32));
+  }
 
   function sfx(name) {
-    if (muted) return;
+    if (muted || !sfxEnabled) return;
     if (!ensureCtx()) return;
     if (name === 'gun') sfxGun();
     else if (name === 'hit') sfxHit();
     else if (name === 'shield') sfxShield();
     else if (name === 'card') sfxCard();
     else if (name === 'challenge') sfxChallenge();
+    else if (name === 'win') sfxWin();
   }
 
-  // 背景音乐：慢速柔和琶音 + 低频铺底
-  const ARP = [220, 261.63, 329.63, 392, 440, 392, 329.63, 261.63];
-  function scheduleArp() {
+  // 背景音乐：和弦进行(Am-F-C-G) + 持续铺底 + 低音脉冲 + 琶音旋律，循环不单调
+  const BGM_BARS = [
+    { bass: 110.00, pad: [220.00, 261.63, 329.63], arp: [440.00, 329.63, 261.63, 329.63] }, // Am
+    { bass: 87.31,  pad: [174.61, 220.00, 261.63], arp: [349.23, 261.63, 220.00, 261.63] }, // F
+    { bass: 130.81, pad: [196.00, 261.63, 329.63], arp: [392.00, 329.63, 261.63, 329.63] }, // C
+    { bass: 98.00,  pad: [196.00, 246.94, 293.66], arp: [392.00, 293.66, 246.94, 293.66] }, // G
+  ];
+  function scheduleBar() {
     if (!bgmOn || !ctx) return;
-    const step = 0.46;
-    ARP.forEach((f, i) => {
+    bgmNodes = []; // 上一小节节点已播放完毕，释放引用
+    const bar = BGM_BARS[bgmBar % BGM_BARS.length];
+    const step = 0.42;
+    const barDur = step * bar.arp.length;
+    // 持续铺底（整小节）
+    bar.pad.forEach(f => {
       const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
       const g = ctx.createGain();
-      const start = ctx.currentTime + i * step;
-      g.gain.setValueAtTime(0.0001, start);
-      g.gain.linearRampToValueAtTime(0.05, start + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.0001, start + step * 0.95);
+      const t = ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.04, t + 0.4);
+      g.gain.setValueAtTime(0.04, t + Math.max(0.01, barDur - 0.4));
+      g.gain.linearRampToValueAtTime(0.0001, t + barDur);
       o.connect(g); g.connect(bgmGain);
-      o.start(start); o.stop(start + step);
+      o.start(t); o.stop(t + barDur + 0.05);
+      bgmNodes.push(o);
     });
-    bgmTimer = setTimeout(scheduleArp, ARP.length * step * 1000);
+    // 低音脉冲（第 1、3 拍）
+    [0, 2].forEach(beat => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = bar.bass;
+      const g = ctx.createGain();
+      const t = ctx.currentTime + beat * step * 2;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + step * 1.6);
+      o.connect(g); g.connect(bgmGain);
+      o.start(t); o.stop(t + step * 1.7);
+      bgmNodes.push(o);
+    });
+    // 琶音旋律（每拍一个音）
+    bar.arp.forEach((f, i) => {
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
+      const g = ctx.createGain();
+      const t = ctx.currentTime + i * step;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.06, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + step * 0.9);
+      o.connect(g); g.connect(bgmGain);
+      o.start(t); o.stop(t + step);
+      bgmNodes.push(o);
+    });
+    bgmBar++;
+    bgmTimer = setTimeout(scheduleBar, barDur * 1000);
   }
   function startBGM() {
     if (!ensureCtx()) return;
     resume();
     if (bgmOn) return;
+    if (!bgmEnabled) return; // 用户已关闭 BGM
     bgmOn = true;
-    bgmGain = ctx.createGain(); bgmGain.gain.value = 0.5; bgmGain.connect(master);
-    // 低频铺底（两枚微失谐正弦）
-    [110, 110.6, 164.81].forEach((f, i) => {
-      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08 + i * 0.02;
-      const lfoG = ctx.createGain(); lfoG.gain.value = 2 + i;
-      lfo.connect(lfoG); lfoG.connect(o.frequency);
-      const g = ctx.createGain(); g.gain.value = 0.18;
-      o.connect(g); g.connect(bgmGain);
-      o.start(); lfo.start();
-      bgmNodes.push(o, lfo);
-    });
-    scheduleArp();
+    bgmGain = ctx.createGain(); bgmGain.gain.value = 0.45; bgmGain.connect(master);
+    bgmBar = 0;
+    scheduleBar();
   }
   function stopBGM() {
     bgmOn = false;
@@ -2022,13 +2089,18 @@ const AudioSys = (function () {
     bgmNodes = [];
     if (bgmGain) { try { bgmGain.disconnect(); } catch (e) {} bgmGain = null; }
   }
+  function setBgmEnabled(v) { bgmEnabled = !!v; if (bgmEnabled) startBGM(); else stopBGM(); }
+  function setSfxEnabled(v) { sfxEnabled = !!v; }
+  function isBgmEnabled() { return bgmEnabled; }
+  function isSfxEnabled() { return sfxEnabled; }
   function toggleMute() {
     muted = !muted;
     if (master) master.gain.value = muted ? 0 : 0.9;
     return muted;
   }
   function isMuted() { return muted; }
-  return { init, startBGM, stopBGM, sfx, toggleMute, isMuted, resume };
+  return { init, startBGM, stopBGM, sfx, toggleMute, isMuted, resume,
+           setBgmEnabled, setSfxEnabled, isBgmEnabled, isSfxEnabled };
 })();
 
 // 便捷封装（供游戏各处的音频注入点调用，失败静默）
@@ -3701,6 +3773,7 @@ function endGame(winner) {
     document.getElementById('gameOverText').textContent = '恭喜 ' + winner.name + ' ' + reason;
     avatarImg.src = winner.avatar || '';
     spawnWinnerConfetti();
+    audioSfx('win'); // 胜利音效
   } else {
     document.getElementById('gameOverTitle').textContent = '全员淘汰';
     document.getElementById('gameOverText').textContent = '所有人都在酒馆倒下了...';
@@ -3720,15 +3793,40 @@ function hideRulesModal() {
   document.getElementById('rulesModal').classList.remove('show');
 }
 
-function toggleAudio() {
-  const muted = AudioSys.toggleMute();
+function updateAudioBtn() {
   const btn = document.getElementById('audioToggle');
-  if (btn) {
-    btn.textContent = muted ? '🔇 静音' : '🔊 音效';
-    btn.classList.toggle('muted', muted);
-  }
-  if (!muted) { AudioSys.init(); AudioSys.startBGM(); }
+  if (!btn) return;
+  const both = !AudioSys.isBgmEnabled() && !AudioSys.isSfxEnabled();
+  btn.textContent = both ? '🔇 静音' : '🔊 音频';
+  btn.classList.toggle('muted', both);
 }
+function toggleAudioPanel() {
+  const p = document.getElementById('audioPanel');
+  if (!p) return;
+  const show = p.style.display === 'none' || !p.style.display;
+  p.style.display = show ? 'block' : 'none';
+  if (show) updateAudioBtn();
+}
+function toggleBgm() {
+  const on = AudioSys.isBgmEnabled();
+  AudioSys.setBgmEnabled(!on);
+  const sw = document.getElementById('bgmSwitch');
+  if (sw) { sw.textContent = !on ? '开' : '关'; sw.classList.toggle('on', !on); sw.classList.toggle('off', on); }
+  updateAudioBtn();
+}
+function toggleSfx() {
+  const on = AudioSys.isSfxEnabled();
+  AudioSys.setSfxEnabled(!on);
+  const sw = document.getElementById('sfxSwitch');
+  if (sw) { sw.textContent = !on ? '开' : '关'; sw.classList.toggle('on', !on); sw.classList.toggle('off', on); }
+  updateAudioBtn();
+}
+document.addEventListener('click', function (e) {
+  const wrap = document.querySelector('.audio-wrap');
+  const p = document.getElementById('audioPanel');
+  if (!p || !wrap) return;
+  if (!wrap.contains(e.target)) p.style.display = 'none';
+});
 
 function showConfig() {
   const cfg = gameState.config;
