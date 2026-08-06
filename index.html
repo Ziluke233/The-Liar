@@ -1809,6 +1809,11 @@ body {
       <div class="field"><label>API Key</label><input type="password" id="cfgApiKey" placeholder="sk-..."></div>
     </div>
     <div class="config-section">
+      <div class="sec-title">🎚️ 游戏难度</div>
+      <label class="own-api-toggle"><input type="checkbox" id="cfgMultiHp"> 降低难度（3 条命，中弹只扣 1 点）</label>
+      <p class="config-hint" style="margin-top:6px">默认关闭＝一命通关：中弹一次即被淘汰（原版玩法）。开启后延长对局、更耐玩，适合新手。</p>
+    </div>
+    <div class="config-section">
       <div class="sec-title">🤖 人机玩家（名字 / 性格人设 / 独立 API）</div>
       <div id="playerConfigList"></div>
     </div>
@@ -1865,6 +1870,8 @@ window.addEventListener('keydown', event => {
 });
 // ==================== 常量 ====================
 const MAX_HP = 3;
+const GAME_SETTINGS_KEY = 'theLiarGameSettings';
+let gameSettings = { multiHp: false }; // 难度：默认一条血（中弹即淘汰）；开启后 3 条命降低难度
 const GUN_CHAMBERS = 6;
 const MAX_PLAYERS = 4;
 const CARDS_PER_HAND = 5;
@@ -2122,7 +2129,8 @@ function initGame() {
     ...cfg,
     personalityText: cfg.personalityText,
     api: JSON.parse(JSON.stringify(cfg.api)),
-    hp: MAX_HP,
+    hp: gameSettings.multiHp ? 3 : 1,
+    maxHp: gameSettings.multiHp ? 3 : 1,
     alive: true,
     hand: [],
     currentBullet: 0,
@@ -2953,10 +2961,11 @@ function renderSeats() {
     // HP
     const hpBox = document.createElement('div');
     hpBox.className = 'hp-box';
+    const maxHp = p.maxHp || MAX_HP;
     const hp = Math.max(0, p.hp);
-    const dangerAt = Math.max(1, Math.ceil(MAX_HP / 3));
-    const warnAt = Math.max(dangerAt + 1, Math.ceil(MAX_HP * 2 / 3));
-    for (let i = 0; i < MAX_HP; i++) {
+    const dangerAt = Math.max(1, Math.ceil(maxHp / 3));
+    const warnAt = Math.max(dangerAt + 1, Math.ceil(maxHp * 2 / 3));
+    for (let i = 0; i < maxHp; i++) {
       const seg = document.createElement('div');
       seg.className = 'hp-seg';
       if (i < hp) {
@@ -3899,6 +3908,8 @@ function showConfig() {
   document.getElementById('cfgApiUrl').value = cfg.apiUrl || 'https://api.deepseek.com/v1/chat/completions';
   document.getElementById('cfgModel').value = cfg.model || 'deepseek-v4-flash';
   document.getElementById('cfgApiKey').value = cfg.apiKey || '';
+  const mcb = document.getElementById('cfgMultiHp');
+  if (mcb) mcb.checked = !!gameSettings.multiHp;
   // 构建每个 AI 玩家的配置卡片
   const list = document.getElementById('playerConfigList');
   list.innerHTML = '';
@@ -3932,6 +3943,8 @@ function saveConfig() {
   gameState.config.apiUrl = document.getElementById('cfgApiUrl').value.trim() || 'https://api.deepseek.com/v1/chat/completions';
   gameState.config.model = document.getElementById('cfgModel').value.trim() || 'deepseek-v4-flash';
   gameState.config.apiKey = document.getElementById('cfgApiKey').value.trim();
+  const mcb = document.getElementById('cfgMultiHp');
+  if (mcb) { gameSettings.multiHp = mcb.checked; persistGameSettings(); }
   gameState.players.filter(p => !p.isHuman).forEach(p => {
     const nameEl = document.getElementById('pc_name_' + p.id);
     const personaEl = document.getElementById('pc_persona_' + p.id);
@@ -4021,6 +4034,10 @@ function persistConfig() {
 }
 function loadPersistedConfig() {
   try {
+    const gsRaw = localStorage.getItem(GAME_SETTINGS_KEY);
+    if (gsRaw) { const g = JSON.parse(gsRaw); if (g && typeof g.multiHp === 'boolean') gameSettings.multiHp = g.multiHp; }
+  } catch (e) { /* 忽略 */ }
+  try {
     const raw = localStorage.getItem(CONFIG_STORE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
@@ -4034,6 +4051,9 @@ function loadPersistedConfig() {
     }
     if (data.overrides) playerOverrides = data.overrides || {};
   } catch (e) { /* 忽略 */ }
+}
+function persistGameSettings() {
+  try { localStorage.setItem(GAME_SETTINGS_KEY, JSON.stringify({ multiHp: !!gameSettings.multiHp })); } catch (e) {}
 }
 
 // ==================== 工具函数 ====================
