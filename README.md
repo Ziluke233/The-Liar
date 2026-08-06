@@ -37,13 +37,14 @@
 
 ## 2. 在线链接（部署）
 
-本项目已部署为静态站点，可直接访问：
+本项目已通过 **GitHub Pages** 永久部署，可直接访问：
 
 | 项目 | 地址 |
 | --- | --- |
-| **线上访问地址** | https://f68b7727ff9a4aa6aeb7e89abc472dc1.gz5.agentos-app.net |
+| **GitHub Pages（推荐，永久）** | https://ziluke233.github.io/The-Liar/ |
+| 仓库主页 | https://github.com/Ziluke233/The-Liar |
 
-> 说明：部署版本为 `TheLiar_standalone.html` 的单文件构建（所有 SVG 资源已内联为 base64，0 外部依赖）。线上环境使用 `https` 协议，相比本地 `file://` 能更好地规避大模型接口的浏览器跨域（CORS）限制。
+> 说明：部署版本为 `TheLiar_standalone.html` 的单文件构建（所有 SVG 资源已内联为 base64，0 外部依赖），发布在仓库的 `gh-pages` 分支。线上环境使用 `https` 协议，相比本地 `file://` 能更好地规避大模型接口的浏览器跨域（CORS）限制。
 
 ---
 
@@ -147,7 +148,7 @@ npx serve .
 | 网络 | Fetch API + `AbortController` | 调用 OpenAI 兼容 LLM 接口，9s 超时 |
 | 通信协议 | OpenAI Chat Completions 兼容格式 | 支持 DeepSeek / OpenAI / 智谱 / Gemini 等 |
 | 构建/依赖 | **无构建步骤、无第三方依赖、无后端** | 双击即玩，部署即静态托管 |
-| 部署 | 静态站点（CloudStudio Sandbox） | 单 `index.html` 静态托管 |
+| 部署 | GitHub Pages（`gh-pages` 分支，单文件静态托管） |
 
 **为什么没有后端？** 游戏状态完全在浏览器内维护，LLM 由前端直接调用（用户自带 Key）；配置与对局数据均留在本地，既零成本又保护密钥不外泄。
 
