@@ -157,7 +157,7 @@ npx serve .
 ## 6. 常见问题 / 故障排查
 
 - **连接失败：`HTTP 400 ... but you passed gpt-4`**
-  模型名称填错了。把「模型名称」从默认占位 `gpt-4` 改为你所用厂商的真实模型 ID，例如 DeepSeek 用 `deepseek-v4-flash`、OpenAI 用 `gpt-4o`、智谱用 `glm-4-flash`。
+  模型名称填错了。默认已预填为 DeepSeek 的 `deepseek-v4-flash`；若你改用其他厂商，请把「模型名称」改成该厂商的真实模型 ID，例如 OpenAI 用 `gpt-4o`、智谱用 `glm-4-flash`。
 
 - **连接失败：网络/跨域(CORS)错误**
   多为 `file://` 协议导致。改用本地 `http` 服务器（方式 B）或已部署的 `https` 站点（方式 C）打开即可。
