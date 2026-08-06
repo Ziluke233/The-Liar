@@ -1646,7 +1646,7 @@ body {
     <span>回合 <strong id="roundDisplay">0</strong></span>
     <span>存活 <strong id="aliveDisplay">4</strong></span>
     <span id="targetDisplay" style="display:none">目标 <strong id="targetValue">-</strong></span>
-    <span id="deckCount" style="display:none">牌堆 <strong id="deckValue">0</strong></span>
+    <span id="deckCount" style="display:none">目标牌 <strong id="deckValue">0</strong> 张</span>
     <span id="lastPlayCount" style="display:none">上家出 <strong id="lastPlayValue">0</strong>张</span>
     <button class="top-btn" onclick="showRules()">规则</button>
     <button class="top-btn" onclick="showConfig()">AI设置</button>
@@ -1815,9 +1815,10 @@ body {
     <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn-gold" onclick="saveConfig()">保存</button>
       <button class="btn btn-red" onclick="testConnection()">测试连接</button>
+      <button class="btn" style="border-color:var(--text-dim);color:var(--text-dim)" onclick="resetConfigResidue()">重置本地配置</button>
       <button class="btn" style="border-color:var(--text-dim);color:var(--text-dim)" onclick="hideConfigModal()">关闭</button>
     </div>
-    <p class="config-hint">提示：所有配置仅保存在你的浏览器本地（localStorage），不会上传到任何服务器。若你的 API 端点不支持跨域(CORS)，需在 API 侧开启 CORS 或用本地代理转发。</p>
+    <p class="config-hint">提示：所有配置仅保存在你的浏览器本地（localStorage），不会上传到任何服务器。若你的 API 端点不支持跨域(CORS)，需在 API 侧开启 CORS 或用本地代理转发。<br>快捷键 <b>Ctrl + Alt + D</b> 可一键清除浏览器残留配置并恢复默认。</p>
   </div>
 </div>
 
@@ -1855,8 +1856,15 @@ window.addEventListener('wheel', event => {
 window.addEventListener('keydown', event => {
   if (event.ctrlKey && ['+', '-', '=', '0'].includes(event.key)) event.preventDefault();
 });
+// 快捷键 Ctrl+Alt+D：清除浏览器残留的 AI 配置并恢复默认
+window.addEventListener('keydown', event => {
+  if (event.ctrlKey && event.altKey && !event.shiftKey && (event.key === 'd' || event.key === 'D')) {
+    event.preventDefault();
+    resetConfigResidue();
+  }
+});
 // ==================== 常量 ====================
-const MAX_HP = 6;
+const MAX_HP = 3;
 const GUN_CHAMBERS = 6;
 const MAX_PLAYERS = 4;
 const CARDS_PER_HAND = 5;
@@ -1893,6 +1901,8 @@ let gameState = {
   players: [],
   deck: [],
   targetCard: null,
+  targetCardsTotal: 6,
+  targetCardsRevealed: 0,
   currentPlayerIdx: 0,
   lastPlayerIdx: -1,
   lastPlayedCards: [],
@@ -2117,6 +2127,7 @@ function initGame() {
     hand: [],
     currentBullet: 0,
     bulletsFired: 0,
+    lastShotLethal: false,
     trustLevels: {},
     lastLied: false,
     caughtLying: false,
@@ -2203,6 +2214,7 @@ function startGame(mode) {
   addLog('🎴 游戏开始！模式：' + (mode === 'builtin' ? '内置AI' : 'AI模型'), 'sys');
   dealCards();
   gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
+  gameState.targetCardsRevealed = 0;
   addLog('🎯 目标牌：' + gameState.targetCard, 'sys');
   renderSeats();
   const dealMs = renderHand(true);
@@ -2226,6 +2238,7 @@ function startRound() {
   // 每轮重新洗牌、发牌、指定目标牌（官方规则：每轮重新发牌）
   dealCards();
   gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
+  gameState.targetCardsRevealed = 0;
   addLog('🎴 第' + gameState.roundCount + '轮开始！目标牌：' + gameState.targetCard, 'sys');
   renderPlayedCards();
   const dealMs = renderHand(true);
@@ -2287,38 +2300,50 @@ async function aiTurn(player) {
 
   const hand = player.hand;
   const target = gameState.targetCard;
-  const hasTarget = hand.filter(c => c === target || c === 'Joker');
-  const others = hand.filter(c => c !== target && c !== 'Joker');
 
   let chosen = [];
   let isLying = false;
 
-  if (player.personality === 'aggressive') {
-    if (hasTarget.length > 0 && Math.random() < 0.7) {
-      chosen = [hasTarget[0]];
-      if (hasTarget.length > 1 && Math.random() < 0.4) chosen.push(hasTarget[1]);
-    } else if (others.length > 0) {
-      chosen = [others[0]];
-      if (others.length > 1 && Math.random() < 0.3) chosen.push(others[1]);
-      isLying = true;
-    } else if (hasTarget.length > 0) {
-      chosen = [hasTarget[0]];
+  // AI 模式且 LLM 可用：让大模型决定打几张、打哪些（含是否虚张声势），替代固定张数
+  if (isLLMUsable(player)) {
+    const llmPlay = await aiDecidePlay(player);
+    if (llmPlay && llmPlay.chosen.length > 0) {
+      chosen = llmPlay.chosen;
+      isLying = llmPlay.isLying;
     }
-  } else if (player.personality === 'analytical') {
-    if (hasTarget.length >= 2) {
-      chosen = hasTarget.slice(0, 2);
-    } else if (hasTarget.length === 1) {
-      chosen = [hasTarget[0]];
-    } else if (others.length > 0) {
-      chosen = [others[0]];
-      isLying = true;
-    }
-  } else {
-    if (hasTarget.length > 0) {
-      chosen = [hasTarget[0]];
-    } else if (others.length > 0) {
-      chosen = [others[0]];
-      isLying = true;
+  }
+
+  if (chosen.length === 0) {
+    const hasTarget = hand.filter(c => c === target || c === 'Joker');
+    const others = hand.filter(c => c !== target && c !== 'Joker');
+
+    if (player.personality === 'aggressive') {
+      if (hasTarget.length > 0 && Math.random() < 0.7) {
+        chosen = [hasTarget[0]];
+        if (hasTarget.length > 1 && Math.random() < 0.4) chosen.push(hasTarget[1]);
+      } else if (others.length > 0) {
+        chosen = [others[0]];
+        if (others.length > 1 && Math.random() < 0.3) chosen.push(others[1]);
+        isLying = true;
+      } else if (hasTarget.length > 0) {
+        chosen = [hasTarget[0]];
+      }
+    } else if (player.personality === 'analytical') {
+      if (hasTarget.length >= 2) {
+        chosen = hasTarget.slice(0, 2);
+      } else if (hasTarget.length === 1) {
+        chosen = [hasTarget[0]];
+      } else if (others.length > 0) {
+        chosen = [others[0]];
+        isLying = true;
+      }
+    } else {
+      if (hasTarget.length > 0) {
+        chosen = [hasTarget[0]];
+      } else if (others.length > 0) {
+        chosen = [others[0]];
+        isLying = true;
+      }
     }
   }
 
@@ -2621,6 +2646,32 @@ async function aiChallengeDecisionLLM(challenger, targetPlayer, cards, isLying, 
   }
 }
 
+// AI 模式：让 LLM 决定本轮打几张、打哪些牌（含是否虚张声势），替代内置固定张数逻辑
+async function aiDecidePlay(player) {
+  if (gameState.gameOver) return null;
+  const target = gameState.targetCard;
+  const hand = player.hand;
+  if (!hand || hand.length === 0) return null;
+  const maxCount = Math.min(3, hand.length);
+  const ownHand = hand.map((c, i) => (i + 1) + ':' + (c === 'Joker' ? 'Joker(万能)' : (c === target ? c + '(目标)' : c))).join('  ');
+  const sys = '你是《骗子酒馆》玩家「' + player.name + '」，性格：' + (player.personalityText || '') +
+    '\n严格限制：你【只能】知道【你自己】的手牌，绝不知道别人手牌或别人是否说谎。你的决策必须基于公开信息与策略来「赌」。' +
+    '\n现在轮到你出牌。你要从自己手里选 1 到 ' + maxCount + ' 张牌打出，并对外宣称它们全都是本轮目标牌【' + target + '】。' +
+    '\n策略：手里有目标牌或万能牌时可如实打出（安全）；没有时可冒险打出别的牌虚张声势（说谎）。也可借多打几张施压或控场。';
+  const usr = '本轮目标牌：' + target + '。你的手牌（带序号）：' + ownHand + '\n请只回复一行：你要打出的手牌序号（1 到 ' + hand.length + '），用逗号分隔，写 1 到 ' + maxCount + ' 个，例如 "1" 或 "1,3"。不要任何解释。';
+  const decision = await callAI(player, sys, usr);
+  if (!decision) return null; // LLM 失败，交回内置逻辑
+  const nums = (decision.match(/\d+/g) || []).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= hand.length);
+  const seen = new Set();
+  const idxList = [];
+  for (const n of nums) { if (!seen.has(n)) { seen.add(n); idxList.push(n - 1); } }
+  if (idxList.length === 0) return null;
+  const chosenIdx = idxList.slice(0, maxCount);
+  const chosen = chosenIdx.map(i => hand[i]);
+  const isLying = chosen.some(c => c !== target && c !== 'Joker');
+  return { chosen, isLying };
+}
+
 // 统一的「发起质疑」动作（内置与 LLM 共用）
 function proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue) {
   showBubble(challenger, '质疑!', 'challenge');
@@ -2636,6 +2687,9 @@ function proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue) {
 async function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
   if (gameState.gameOver) return;
   const allValid = cards.every(c => c === gameState.targetCard || c === 'Joker');
+
+  // 被翻开的牌中若含目标牌，计入「已揭示目标牌」用于右上角统计
+  cards.forEach(c => { if (c === gameState.targetCard) gameState.targetCardsRevealed++; });
 
   // 累计本局统计
   gameState.challengeCount++;
@@ -2670,32 +2724,38 @@ async function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
 async function performPenalty(player) {
   if (gameState.gameOver) return;
   hideReactionModal();
-  const shotNum = player.currentBullet + 1; // 第几枪（1-indexed）
-  let isBullet;
-  if (shotNum >= GUN_CHAMBERS) {
-    isBullet = true; // 第六枪必死
-  } else {
-    isBullet = Math.random() < 0.5; // 前 5 枪各二分之一概率
-  }
-  player.currentBullet = (player.currentBullet + 1) % GUN_CHAMBERS;
+
+  // 公平轮盘：每发重新随机装弹，6 个弹巢中仅 1 发实弹 → 单次中弹概率 1/6
+  const isBullet = Math.random() < 1 / GUN_CHAMBERS;
+  player.currentBullet = Math.floor(Math.random() * GUN_CHAMBERS); // 记录本次击发的弹巢
   player.bulletsFired++;
+  player.lastShotLethal = isBullet;
+
+  // 先结算生命（在动画之前，保证弹窗文案读取到正确剩余生命）
+  let died = false;
+  if (isBullet) {
+    player.hp = Math.max(0, player.hp - 1); // 中弹扣 1 点生命，而非秒杀
+    if (player.hp <= 0) died = true;
+  }
 
   // 先播放开枪动画序列（枪指向玩家 + 屏幕中心符号 3s）
   await playPenaltySequence(player, isBullet);
 
   if (isBullet) {
     addLog('💥 砰！' + player.name + '中弹了！', 'bad');
-    player.hp = 0;
-    player.alive = false;
-    try {
-      triggerDeathEffects(player);
-    } catch (error) {
-      console.error('triggerDeathEffects failed:', error);
+    if (died) {
+      player.alive = false;
+      try {
+        triggerDeathEffects(player);
+      } catch (error) {
+        console.error('triggerDeathEffects failed:', error);
+      }
+      const dialogue = getDialogue(player, 'death');
+      showBubble(player, dialogue);
+      addLog('💀 【' + player.name + '】淘汰！"' + dialogue + '"', 'bad');
+    } else {
+      addLog('🩸 【' + player.name + '】受伤，剩余 ' + player.hp + ' 点生命', 'bad');
     }
-
-    const dialogue = getDialogue(player, 'death');
-    showBubble(player, dialogue);
-    addLog('💀 【' + player.name + '】淘汰！"' + dialogue + '"', 'bad');
   } else {
     addLog('🔘 咔...' + player.name + '安全，本轮结束', 'sys');
   }
@@ -2892,13 +2952,15 @@ function renderSeats() {
     const hpBox = document.createElement('div');
     hpBox.className = 'hp-box';
     const hp = Math.max(0, p.hp);
+    const dangerAt = Math.max(1, Math.ceil(MAX_HP / 3));
+    const warnAt = Math.max(dangerAt + 1, Math.ceil(MAX_HP * 2 / 3));
     for (let i = 0; i < MAX_HP; i++) {
       const seg = document.createElement('div');
       seg.className = 'hp-seg';
       if (i < hp) {
         seg.classList.add('on');
-        if (hp <= 2) seg.classList.add('danger');
-        else if (hp <= 3) seg.classList.add('warn');
+        if (hp <= dangerAt) seg.classList.add('danger');
+        else if (hp <= warnAt) seg.classList.add('warn');
       }
       hpBox.appendChild(seg);
     }
@@ -2909,7 +2971,7 @@ function renderSeats() {
     for (let i = 0; i < GUN_CHAMBERS; i++) {
       const ch = document.createElement('div');
       let cls = 'gun-ch';
-      if (i === p.currentBullet) cls += ' current';
+      if (p.bulletsFired > 0 && i === p.currentBullet) cls += ' current ' + (p.lastShotLethal ? 'bullet' : 'spent');
       if (p.bulletsFired > 0) {
         // 已开过的弹舱位置（按currentBullet回绕计算）
         let isSpent = false;
@@ -2919,9 +2981,7 @@ function renderSeats() {
           if (i === pos) { isSpent = true; break; }
           pos--;
         }
-        if (isSpent) cls += ' spent';
       }
-      if (i === GUN_CHAMBERS - 1) cls += ' lethal'; // 第六枪必死
       ch.className = cls;
       gunBox.appendChild(ch);
     }
@@ -3104,8 +3164,11 @@ function updateDisplay() {
   // 牌堆剩余
   const deckEl = document.getElementById('deckCount');
   const deckVal = document.getElementById('deckValue');
-  if (gameState.gameStarted) { deckEl.style.display = ''; deckVal.textContent = gameState.deck.length; }
-  else { deckEl.style.display = 'none'; }
+  if (gameState.gameStarted) {
+    deckEl.style.display = '';
+    const remaining = Math.max(0, (gameState.targetCardsTotal || 6) - (gameState.targetCardsRevealed || 0));
+    deckVal.textContent = remaining;
+  } else { deckEl.style.display = 'none'; }
   
   // 上家出牌数
   const lastEl = document.getElementById('lastPlayCount');
@@ -3365,11 +3428,12 @@ function showPenaltyPopup(player, isBullet) {
   popup.className = 'penalty-popup' + (isBullet ? ' bullet' : ' empty');
 
   if (isBullet) {
+    const eliminated = !player.alive;
     popup.innerHTML = 
       '<div class="penalty-icon">💥</div>' +
       '<div class="penalty-title">砰！</div>' +
       '<div class="penalty-desc">' + player.name + ' 中弹了！</div>' +
-      '<div class="penalty-sub">被淘汰出局</div>';
+      '<div class="penalty-sub">' + (eliminated ? '被淘汰出局' : ('还剩 ' + player.hp + ' 点生命')) + '</div>';
   } else {
     popup.innerHTML = 
       '<div class="penalty-icon">🔘</div>' +
@@ -3914,6 +3978,36 @@ async function testConnection() {
 
 // ==================== 配置持久化 ====================
 const CONFIG_STORE_KEY = 'theLiarAiConfig';
+// 轻量提示
+function showConfigToast(msg) {
+  let t = document.getElementById('cfgToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'cfgToast';
+    t.style.cssText = 'position:fixed;left:50%;top:24px;transform:translateX(-50%);background:rgba(20,20,28,.95);color:#e8e8ef;padding:10px 16px;border-radius:8px;font-size:14px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);transition:opacity .3s;border:1px solid rgba(255,255,255,.12)';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2200);
+}
+// 清除浏览器残留配置，恢复 DeepSeek 默认（不重新持久化，保持已清除状态）
+function resetConfigResidue() {
+  try { localStorage.removeItem(CONFIG_STORE_KEY); } catch (e) {}
+  gameState.config = {
+    apiUrl: 'https://api.deepseek.com/v1/chat/completions',
+    model: 'deepseek-v4-flash',
+    apiKey: ''
+  };
+  const u = document.getElementById('cfgApiUrl');
+  const m = document.getElementById('cfgModel');
+  const k = document.getElementById('cfgApiKey');
+  if (u) u.value = gameState.config.apiUrl;
+  if (m) m.value = gameState.config.model;
+  if (k) k.value = '';
+  showConfigToast('已清除浏览器残留配置，恢复 DeepSeek 默认');
+}
 function persistConfig() {
   try {
     const data = {
