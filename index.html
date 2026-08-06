@@ -3891,11 +3891,25 @@ function saveConfig() {
     startGame(m);
   }
 }
+// 把底层错误翻译成清晰可操作的中文提示
+function aiErrorHint(err) {
+  if (!err) return '未知错误（检查地址/Key）';
+  const e = String(err);
+  if (e.includes('HTTP 401')) return 'Key 无效或已过期 → 请到 platform.deepseek.com 重新生成 Key 并粘贴';
+  if (e.includes('HTTP 402')) return '余额不足 → DeepSeek 新账户需至少充值 $2 才能调用 API';
+  if (e.includes('HTTP 400')) return '请求参数错误（多为模型名不被该账户支持）→ 确认模型名正确，或换用 deepseek-chat';
+  if (e.includes('HTTP 403')) return '无权限（Key 被限流或账户异常）';
+  if (e.includes('HTTP 429')) return '请求过于频繁 → 稍后重试';
+  if (e.includes('CORS') || e.includes('跨域') || e.includes('Failed to fetch')) return '网络/跨域被拦截 → 直接双击打开本地文件或换网络再试';
+  if (e.includes('超时') || e.includes('AbortError')) return '请求超时（9秒未响应）→ 网络慢或模型繁忙，稍后重试';
+  return e;
+}
+
 async function testConnection() {
   addLog('🔄 正在测试连接...', 'sys');
   const text = await callAI({ api: { useOwn: false } }, '你是测试助手。', '只回复"OK"两个字。');
   if (text) addLog('✅ 连接成功：' + text.slice(0, 24), 'good');
-  else addLog('❌ 连接失败：' + (window.__lastAIError || '未知错误（检查地址/Key）'), 'bad');
+  else addLog('❌ 连接失败：' + aiErrorHint(window.__lastAIError), 'bad');
 }
 
 // ==================== 配置持久化 ====================
@@ -3914,7 +3928,14 @@ function loadPersistedConfig() {
     const raw = localStorage.getItem(CONFIG_STORE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
-    if (data.config) gameState.config = Object.assign({}, gameState.config, data.config);
+    if (data.config) {
+      const c = data.config;
+      const def = { apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash' };
+      // 仅当保存的值有效时才覆盖默认值；空值或旧占位模型(gpt-4)回退到当前默认，避免旧配置把 DeepSeek 默认覆盖掉
+      gameState.config.apiUrl = (c.apiUrl && c.apiUrl.trim()) ? c.apiUrl.trim() : def.apiUrl;
+      gameState.config.model = (c.model && c.model.trim() && c.model.trim() !== 'gpt-4') ? c.model.trim() : def.model;
+      gameState.config.apiKey = (c.apiKey && c.apiKey.trim()) ? c.apiKey.trim() : '';
+    }
     if (data.overrides) playerOverrides = data.overrides || {};
   } catch (e) { /* 忽略 */ }
 }
