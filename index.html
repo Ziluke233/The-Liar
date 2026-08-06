@@ -2127,6 +2127,7 @@ function initGame() {
     hand: [],
     currentBullet: 0,
     bulletsFired: 0,
+    liveChamber: Math.floor(Math.random() * GUN_CHAMBERS), // 本局固定弹位：6 槽中的 1 发实弹
     lastShotLethal: false,
     trustLevels: {},
     lastLied: false,
@@ -2725,11 +2726,12 @@ async function performPenalty(player) {
   if (gameState.gameOver) return;
   hideReactionModal();
 
-  // 公平轮盘：每发重新随机装弹，6 个弹巢中仅 1 发实弹 → 单次中弹概率 1/6
-  const isBullet = Math.random() < 1 / GUN_CHAMBERS;
-  player.currentBullet = Math.floor(Math.random() * GUN_CHAMBERS); // 记录本次击发的弹巢
-  player.bulletsFired++;
+  // 俄罗斯轮盘（正宗规则）：6 槽 1 弹，弹巢顺时针推进、开枪后不复位
+  // 固定弹位 liveChamber，逐发推进；在未被击发前提下越往后下一发实弹概率越大，第 6 发必中
+  const isBullet = (player.currentBullet === player.liveChamber);
   player.lastShotLethal = isBullet;
+  player.currentBullet = (player.currentBullet + 1) % GUN_CHAMBERS; // 顺时针推进，不复位
+  player.bulletsFired++;
 
   // 先结算生命（在动画之前，保证弹窗文案读取到正确剩余生命）
   let died = false;
