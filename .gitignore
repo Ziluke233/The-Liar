@@ -1,4 +1,34 @@
-# Windows特殊文件
+# ----- 依赖 / 包管理 -----
+node_modules/
+.pnp/
+.pnp.js
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ----- 构建 / 输出 -----
+dist/
+build/
+out/
+.cache/
+coverage/
+
+# ----- 环境变量 / 密钥（切勿提交） -----
+.env
+.env.*
+*.local
+
+# ----- 编辑器 / IDE -----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ----- 日志 -----
+logs/
+*.log
+
+# ----- Windows 特殊文件 -----
 nul
 NUL
 con
@@ -8,15 +38,12 @@ PRN
 aux
 AUX
 
-# Dumate会话日志
-.dumate/
-
-# 系统文件
+# ----- 系统文件 -----
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# 临时文件
+# ----- 会话 / 临时文件 -----
+.dumate/
 *.tmp
 *.temp
-*.log
