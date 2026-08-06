@@ -52,6 +52,7 @@ body {
   border-bottom: 2px solid var(--border-gold);
   flex-shrink: 0;
 }
+.top-btn.muted { opacity: 0.5; }
 .game-title {
   font-family: var(--font-main);
   font-size: 26px;
@@ -1633,6 +1634,7 @@ body {
     <span id="lastPlayCount" style="display:none">上家出 <strong id="lastPlayValue">0</strong>张</span>
     <button class="top-btn" onclick="showRules()">规则</button>
     <button class="top-btn" onclick="showConfig()">AI设置</button>
+    <button class="top-btn" id="audioToggle" onclick="toggleAudio()" title="背景音乐/音效开关">🔊 音效</button>
   </div>
 </div>
 
@@ -1896,6 +1898,142 @@ const PLAYER_CONFIGS = [
 // 持久化的玩家覆盖（姓名/性格/独立API），跨重开保留
 let playerOverrides = {};
 
+// 选择「AI模型」模式但接口未配置时，先弹出配置界面，配好后再自动开局
+let pendingGameMode = null;
+
+// 是否已配置可用的 LLM 接口（总接口或任一玩家独立接口）
+function isLLMConfigured() {
+  const c = gameState.config;
+  if (c && c.apiUrl && c.apiUrl.trim()) return true;
+  return gameState.players.some(p => p.api && p.api.useOwn && p.api.apiUrl && p.api.apiUrl.trim());
+}
+// 当前玩家是否可用 LLM（AI 模式下且有可用接口）
+function isLLMUsable(player) {
+  if (gameState.gameMode !== 'ai') return false;
+  const c = gameState.config;
+  if (c && c.apiUrl && c.apiUrl.trim()) return true;
+  return !!(player && player.api && player.api.useOwn && player.api.apiUrl && player.api.apiUrl.trim());
+}
+
+// ==================== 音频系统（WebAudio 合成，无需外部文件） ====================
+// 提供：背景音乐(循环柔和琶音+铺底)、开枪/子弹命中/盾牌/出牌/质疑 等音效；右上角可静音。
+const AudioSys = (function () {
+  let ctx = null, master = null, bgmGain = null, bgmNodes = [], bgmTimer = null, bgmOn = false, muted = false;
+  function ensureCtx() {
+    if (ctx) return true;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = muted ? 0 : 0.9;
+      master.connect(ctx.destination);
+      return true;
+    } catch (e) { ctx = null; return false; }
+  }
+  function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  function init() { if (ensureCtx()) resume(); }
+
+  // 单个振荡器音
+  function tone(freq, start, dur, type, vol, attack) {
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, ctx.currentTime + start);
+    const t = ctx.currentTime + start;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + (attack || 0.01));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  // 噪声（用于枪声/打击）
+  function noise(start, dur, vol, filterFreq, type) {
+    if (!ctx) return;
+    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = type || 'lowpass';
+    f.frequency.value = filterFreq || 1400;
+    const g = ctx.createGain(); g.gain.value = vol;
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(ctx.currentTime + start);
+  }
+
+  function sfxGun() { if (!ctx) return; resume(); noise(0, 0.22, 0.6, 2000); tone(150, 0, 0.25, 'sawtooth', 0.4); tone(70, 0, 0.4, 'square', 0.35); }
+  function sfxHit() { if (!ctx) return; resume(); noise(0, 0.4, 0.75, 900); tone(55, 0, 0.5, 'square', 0.55); tone(110, 0.02, 0.3, 'sawtooth', 0.25); }
+  function sfxShield() { if (!ctx) return; resume(); tone(660, 0, 0.16, 'sine', 0.35); tone(880, 0.07, 0.22, 'sine', 0.3); tone(1320, 0.15, 0.26, 'sine', 0.2); }
+  function sfxCard() { if (!ctx) return; resume(); noise(0, 0.07, 0.18, 3500, 'highpass'); tone(320, 0, 0.05, 'triangle', 0.12); }
+  function sfxChallenge() { if (!ctx) return; resume(); tone(520, 0, 0.12, 'square', 0.25); tone(780, 0.09, 0.15, 'square', 0.2); }
+
+  function sfx(name) {
+    if (muted) return;
+    if (!ensureCtx()) return;
+    if (name === 'gun') sfxGun();
+    else if (name === 'hit') sfxHit();
+    else if (name === 'shield') sfxShield();
+    else if (name === 'card') sfxCard();
+    else if (name === 'challenge') sfxChallenge();
+  }
+
+  // 背景音乐：慢速柔和琶音 + 低频铺底
+  const ARP = [220, 261.63, 329.63, 392, 440, 392, 329.63, 261.63];
+  function scheduleArp() {
+    if (!bgmOn || !ctx) return;
+    const step = 0.46;
+    ARP.forEach((f, i) => {
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
+      const g = ctx.createGain();
+      const start = ctx.currentTime + i * step;
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.linearRampToValueAtTime(0.05, start + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + step * 0.95);
+      o.connect(g); g.connect(bgmGain);
+      o.start(start); o.stop(start + step);
+    });
+    bgmTimer = setTimeout(scheduleArp, ARP.length * step * 1000);
+  }
+  function startBGM() {
+    if (!ensureCtx()) return;
+    resume();
+    if (bgmOn) return;
+    bgmOn = true;
+    bgmGain = ctx.createGain(); bgmGain.gain.value = 0.5; bgmGain.connect(master);
+    // 低频铺底（两枚微失谐正弦）
+    [110, 110.6, 164.81].forEach((f, i) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08 + i * 0.02;
+      const lfoG = ctx.createGain(); lfoG.gain.value = 2 + i;
+      lfo.connect(lfoG); lfoG.connect(o.frequency);
+      const g = ctx.createGain(); g.gain.value = 0.18;
+      o.connect(g); g.connect(bgmGain);
+      o.start(); lfo.start();
+      bgmNodes.push(o, lfo);
+    });
+    scheduleArp();
+  }
+  function stopBGM() {
+    bgmOn = false;
+    if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
+    bgmNodes.forEach(n => { try { n.stop(); } catch (e) {} });
+    bgmNodes = [];
+    if (bgmGain) { try { bgmGain.disconnect(); } catch (e) {} bgmGain = null; }
+  }
+  function toggleMute() {
+    muted = !muted;
+    if (master) master.gain.value = muted ? 0 : 0.9;
+    return muted;
+  }
+  function isMuted() { return muted; }
+  return { init, startBGM, stopBGM, sfx, toggleMute, isMuted, resume };
+})();
+
+// 便捷封装（供游戏各处的音频注入点调用，失败静默）
+function audioSfx(name) { try { AudioSys.sfx(name); } catch (e) {} }
+
 // ==================== 初始化 ====================
 function initGame() {
   gameState.players = PLAYER_CONFIGS.map(cfg => ({
@@ -1976,7 +2114,17 @@ function hideModeModal() {
 
 function startGame(mode) {
   gameState.gameMode = mode;
+  // 选「AI模型」模式但还没配置过接口：先进配置界面，配好后再自动开局
+  if (mode === 'ai' && !isLLMConfigured()) {
+    pendingGameMode = mode;
+    hideModeModal();
+    showConfig();
+    addLog('⚙️ 检测到尚未配置 AI 接口，请先填写并保存配置（保存后将自动开始游戏）', 'sys');
+    return;
+  }
   hideModeModal();
+  AudioSys.init();
+  AudioSys.startBGM();
   initGame();
   gameState.gameStarted = true;
   gameState.roundCount = 1;
@@ -2185,6 +2333,7 @@ function animateCardsFromPlayer(player, cards, callback, showBack) {
   let completed = 0;
   cards.forEach((card, i) => {
     setTimeout(() => {
+      audioSfx('card'); // 出牌音效
       const fly = showBack ? createCardBackElement() : createFlyingCard(card);
 
       // 起点：玩家头像中心
@@ -2295,12 +2444,10 @@ function playCards(player, cards, isLying) {
 }
 
 // ==================== 质疑 ====================
-async function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChallenge = false) {
-  if (gameState.gameOver) return;
+// 内置模式按性格概率(含作弊式知晓 isLying)决定；AI 模式改由 LLM 依据公开信息推理
+function builtinShouldChallenge(challenger, isLying, cards, trust, forceChallenge) {
   let shouldChallenge = forceChallenge;
-  const trust = challenger.trustLevels[targetPlayer.name] || 50;
   const rand = Math.random();
-
   if (challenger.personality === 'aggressive') {
     shouldChallenge = isLying ? rand < 0.85 : rand < 0.4;
   } else if (challenger.personality === 'analytical') {
@@ -2308,11 +2455,22 @@ async function aiChallengeDecision(challenger, targetPlayer, cards, isLying, for
   } else {
     shouldChallenge = isLying ? rand < 0.5 : rand < 0.15;
   }
-
   if (cards.length >= 3) shouldChallenge = shouldChallenge || rand < 0.3;
   if (trust < 30) shouldChallenge = true;
   if (trust > 80) shouldChallenge = false;
   if (forceChallenge) shouldChallenge = true;
+  return shouldChallenge;
+}
+
+async function aiChallengeDecision(challenger, targetPlayer, cards, isLying, forceChallenge = false) {
+  if (gameState.gameOver) return;
+  // AI 模式下且 LLM 可用：让大模型根据发言与公开信息推理决定质疑/相信，而非固定概率
+  if (isLLMUsable(challenger)) {
+    await aiChallengeDecisionLLM(challenger, targetPlayer, cards, isLying, forceChallenge);
+    return;
+  }
+  // 否则走内置概率逻辑（或 LLM 不可用时的回退）
+  let shouldChallenge = builtinShouldChallenge(challenger, isLying, cards, challenger.trustLevels[targetPlayer.name] || 50, forceChallenge);
 
   if (shouldChallenge) {
     const dialogue = await getAIBubble(challenger, 'challenge', { actorName: targetPlayer.name, count: cards.length });
@@ -2339,6 +2497,68 @@ async function aiChallengeDecision(challenger, targetPlayer, cards, isLying, for
       if (!gameState.gameOver) nextTurn();
     }, 400);
   }
+}
+
+// AI 模式：让 LLM 根据公开信息和自身手牌推理，决定「质疑」或「相信」上家
+async function aiChallengeDecisionLLM(challenger, targetPlayer, cards, isLying, forceChallenge) {
+  if (gameState.gameOver) return;
+  // 强制质疑（仅剩一人持牌）：直接走质疑流程，仅补一句台词
+  if (forceChallenge) {
+    const dialogue = await getAIBubble(challenger, 'challenge', { actorName: targetPlayer.name, count: cards.length });
+    proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue);
+    return;
+  }
+
+  const target = gameState.targetCard;
+  const round = gameState.roundCount;
+  const trust = challenger.trustLevels[targetPlayer.name] || 50;
+  const ownHand = challenger.hand.map(c => c === 'Joker' ? 'Joker(万能)' : (c === target ? c + '(目标)' : c)).join('、');
+
+  const sys = '你是《骗子酒馆》玩家「' + challenger.name + '」，性格：' + (challenger.personalityText || '') +
+    '\n严格限制：你【只能】知道【你自己】的手牌，绝对不能知道其他玩家的手牌，也更不可能知道别人是否说谎。你的决策必须完全基于公开信息、对手的性格与你的推理来「赌」，而不是事实。' +
+    '\n请扮演该角色，决定要不要质疑上家。';
+  const usr = '本轮目标牌：' + target + '。第' + round + '轮。\n上家【' + targetPlayer.name + '】打出了' + cards.length + '张牌，并宣称这些牌都是目标牌【' + target + '】（你不知道真伪）。\n你目前对' + targetPlayer.name + '的信任度：' + trust + '/100（越高越倾向于相信他）。\n你的手牌：' + ownHand + '。\n现在轮到你决定：是要「质疑」上家，还是「相信」他？\n只回复一个词：质疑 或 相信。不要任何解释。';
+
+  const decision = await callAI(challenger, sys, usr);
+  let shouldChallenge;
+  if (!decision) {
+    // LLM 调用失败/超时：回退到内置概率逻辑，保证游戏可继续
+    shouldChallenge = builtinShouldChallenge(challenger, isLying, cards, trust, false);
+  } else {
+    const d = decision.replace(/\s/g, '');
+    const wantChallenge = /(质疑|挑战|揭穿|说谎|撒谎|不信|假|CHALLENGE)/i.test(d);
+    const wantTrust = /(相信|信任)/.test(d);
+    shouldChallenge = wantChallenge && !wantTrust;
+    if (wantTrust && !wantChallenge) shouldChallenge = false;
+    if (!wantChallenge && !wantTrust) shouldChallenge = builtinShouldChallenge(challenger, isLying, cards, trust, false);
+  }
+
+  if (shouldChallenge) {
+    const dialogue = await getAIBubble(challenger, 'challenge', { actorName: targetPlayer.name, count: cards.length });
+    proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue);
+  } else {
+    const dialogue = await getAIBubble(challenger, 'pass', { actorName: targetPlayer.name });
+    showNotice(challenger.name + ' 不质疑', 'pass');
+    addLog('💬 【' + challenger.name + '】"' + dialogue.replace(/\n/g, ' ') + '" (选择不质疑)', 'dia');
+    gameState.lastPlayerIdx = -1;
+    gameState.awaitingChallenge = false;
+    gameState.forcedChallenge = false;
+    renderSeats();
+    renderActions();
+    setTimeout(() => { if (!gameState.gameOver) nextTurn(); }, 400);
+  }
+}
+
+// 统一的「发起质疑」动作（内置与 LLM 共用）
+function proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue) {
+  showBubble(challenger, '质疑!', 'challenge');
+  showNotice(challenger.name + ' 质疑!', 'challenge');
+  addLog('⚡ 【' + challenger.name + '】质疑！"' + (dialogue || '').replace(/\n/g, ' ') + '"', 'chal');
+  gameState.awaitingChallenge = false;
+  audioSfx('challenge');
+  setTimeout(() => {
+    if (!gameState.gameOver) resolveChallenge(challenger, targetPlayer, cards, isLying);
+  }, 600);
 }
 
 async function resolveChallenge(challenger, targetPlayer, cards, wasLying) {
@@ -2919,8 +3139,9 @@ function showBubble(player, text, type) {
     bubble.classList.add('show');
   });
 
-  // 思考气泡持续到被下一次showBubble替换或手动移除；其他气泡3.5秒后消失
-  const duration = type === 'thinking' ? 30000 : 3500;
+  // 思考气泡持续到被下一次showBubble替换或手动移除；其他气泡按句数停留（每句5秒），避免一闪而过看不清
+  const lineCount = (text || '').split('\n').filter(s => s.trim().length > 0).length || 1;
+  const duration = type === 'thinking' ? 30000 : Math.max(4500, lineCount * 5000);
   setTimeout(() => {
     if (bubble.parentNode && (type !== 'thinking' || !bubble.dataset.persist)) bubble.remove();
   }, duration);
@@ -3025,11 +3246,11 @@ async function getAIBubble(player, situation, extra) {
     '你是名为「' + player.name + '」的玩家，正在玩《骗子酒馆》卡牌游戏。' + (player.personalityText || '') +
     '\n规则：每轮从Q/K/A中随机一张作为目标牌，玩家轮流出牌并宣称打出的都是目标牌（牌背朝上，别的玩家看不到真伪）。下一位玩家可选择质疑或相信。' +
     '\n严格限制：你【只能】知道【你自己】的手牌，绝对不能知道其他任何玩家的手牌，也不能知道别人是否说谎。你只能依据公开信息和推理来发言。' +
-    '\n发言要求：用中文、口语化、贴合你的性格；说1到5句，每句简短（最好不超过20字）；可以拱火、挑衅、分析推理或装无辜，但绝不要暴露你知道别人的牌。直接输出句子，用换行分隔，不要加引号或"我说："之类前缀。';
+    '\n发言要求：用中文、口语化、贴合你的性格；说1到3句，每句简短（最好不超过20字）；可以拱火、挑衅、分析推理或装无辜，但绝不要暴露你知道别人的牌。直接输出句子，用换行分隔，不要加引号或"我说："之类前缀。';
 
   let userPrompt = '';
   if (situation === 'banter') {
-    userPrompt = '公开信息：本轮目标牌是' + target + '，第' + round + '轮，存活玩家：' + aliveNames + '。\n刚才【' + (extra.actorName || '某人') + '】打出了' + (extra.count || '?') + '张牌，宣称是目标牌（你不知真假）。\n你自己的手牌：' + ownHand + '。\n请对这次出牌发表你的反应（怀疑、拱火、分析或装怂均可），1到5句。';
+    userPrompt = '公开信息：本轮目标牌是' + target + '，第' + round + '轮，存活玩家：' + aliveNames + '。\n刚才【' + (extra.actorName || '某人') + '】打出了' + (extra.count || '?') + '张牌，宣称是目标牌（你不知真假）。\n你自己的手牌：' + ownHand + '。\n请对这次出牌发表你的反应（怀疑、拱火、分析或装怂均可），1到3句。';
   } else if (situation === 'play') {
     userPrompt = '轮到你出牌。公开信息：目标牌' + target + '，第' + round + '轮。你手牌：' + ownHand + '。你准备打出' + (extra.count || 1) + '张并宣称是目标牌。用你的性格说一句出牌前的表态（1到2句，简短）。';
   } else if (situation === 'challenge') {
@@ -3045,7 +3266,7 @@ async function getAIBubble(player, situation, extra) {
   return getDialogue(player, situation === 'banter' ? 'play' : situation);
 }
 
-// 某人出牌后，其他存活 AI 各自发表 1~5 句短评（错峰显示）
+// 某人出牌后，其他存活 AI 各自发表 1~3 句短评（错峰显示）
 async function triggerBanter(actor, count) {
   if (gameState.gameMode !== 'ai' || gameState.gameOver) return;
   const reactors = gameState.players.filter(p => p.alive && !p.isHuman && p.id !== actor.id);
@@ -3393,17 +3614,20 @@ function playPenaltySequence(player, isBullet) {
     const gun = aimGunAt(player);
     setTimeout(() => {
       fireGun(gun);
+      audioSfx('gun'); // 开枪音效
       showAvatarSymbol(isBullet ? 'skull' : 'shield', player);
       triggerAvatarParticles(isBullet ? 'skull' : 'shield', player);
       // 等护盾/骷髅与枪动画播放约 2s 后再弹出结算弹窗
       setTimeout(() => { showPenaltyPopup(player, isBullet); }, 2000);
 
       if (isBullet) {
+        audioSfx('hit'); // 中弹命中音效
         triggerAvatarBlood(player); // 中弹：头像持续溅射红色粒子 3s
         triggerScreenShake();
         document.body.classList.add('bullet-time');
         setTimeout(() => document.body.classList.remove('bullet-time'), 300);
       } else {
+        audioSfx('shield'); // 盾牌(安全)音效
         const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
         if (seat) {
           seat.classList.add('flash-red');
@@ -3461,6 +3685,7 @@ function spawnWinnerConfetti() {
 
 function endGame(winner) {
   gameState.gameOver = true;
+  AudioSys.stopBGM();
   const modal = document.getElementById('gameOverModal');
   const box = document.getElementById('winnerModalBox');
   const crown = document.getElementById('winnerCrown');
@@ -3493,6 +3718,16 @@ function showRules() {
 }
 function hideRulesModal() {
   document.getElementById('rulesModal').classList.remove('show');
+}
+
+function toggleAudio() {
+  const muted = AudioSys.toggleMute();
+  const btn = document.getElementById('audioToggle');
+  if (btn) {
+    btn.textContent = muted ? '🔇 静音' : '🔊 音效';
+    btn.classList.toggle('muted', muted);
+  }
+  if (!muted) { AudioSys.init(); AudioSys.startBGM(); }
 }
 
 function showConfig() {
@@ -3551,6 +3786,12 @@ function saveConfig() {
   hideConfigModal();
   addLog('⚙️ AI 配置已保存', 'sys');
   if (gameState.gameStarted) { renderSeats(); updateSideInfo(); }
+  // 若是从「AI模型」模式门禁进入的配置界面，保存后立即自动开局
+  if (pendingGameMode) {
+    const m = pendingGameMode;
+    pendingGameMode = null;
+    startGame(m);
+  }
 }
 async function testConnection() {
   addLog('🔄 正在测试连接...', 'sys');
