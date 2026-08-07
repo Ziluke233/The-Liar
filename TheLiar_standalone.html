@@ -1425,25 +1425,7 @@ body {
     0 0 50px rgba(239,68,68,0.22),
     0 16px 70px rgba(0,0,0,0.75);
 }
-.modal.winner-modal::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 28px;
-  background: conic-gradient(from 0deg, #fbbf24, #f59e0b, #fde68a, #f59e0b, #fbbf24);
-  z-index: -2;
-  animation: winnerBorderSpin 3.5s linear infinite;
-  filter: blur(5px);
-  opacity: 0.85;
-}
-.modal.winner-modal.draw::before {
-  background: conic-gradient(from 0deg, #7f1d1d, #450a0a, #991b1b, #450a0a, #7f1d1d);
-  opacity: 0.7;
-}
-@keyframes winnerBorderSpin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+/* 胜利弹窗旋转黄色边框已移除 */
 .modal-overlay.show .modal.winner-modal {
   animation: winnerModalIn 0.85s cubic-bezier(0.2, 0.9, 0.25, 1.35) both;
 }
@@ -1579,7 +1561,7 @@ body {
   position: fixed;
   width: 8px;
   height: 14px;
-  z-index: 999;
+  z-index: 2000;
   pointer-events: none;
   border-radius: 2px;
   animation: confettiFall 3.8s ease-in forwards;
