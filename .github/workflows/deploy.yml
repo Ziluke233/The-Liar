@@ -1,0 +1,37 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync deploy/ to gh-pages
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git clone --branch gh-pages --single-branch "https://x-access-token:${TOKEN}@github.com/${REPO}" gh-pages-tmp
+          cd gh-pages-tmp
+          rm -f index.html
+          cp ../deploy/index.html ./index.html
+          touch .nojekyll
+          git add -A
+          git commit -m "Auto-deploy from main ${GITHUB_SHA}" && git push origin gh-pages || echo "No changes to deploy"
