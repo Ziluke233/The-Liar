@@ -1729,6 +1729,11 @@ body {
         <div class="title">AI模型</div>
         <div class="desc">接入LLM，智能对话</div>
       </div>
+      <div class="mode-card" onclick="startGame('spectate')">
+        <div class="icon">🐜</div>
+        <div class="title">斗蛐蛐</div>
+        <div class="desc">全员AI对战，观看被AI接管的你</div>
+      </div>
     </div>
     <p style="text-align:center;font-size:11px;margin-top:8px">可随时通过右上角"AI设置"切换模型</p>
   </div>
@@ -1790,6 +1795,13 @@ body {
       <div class="field"><label>API 地址 (OpenAI 兼容)</label><input type="text" id="cfgApiUrl" placeholder="https://api.deepseek.com/v1/chat/completions"></div>
       <div class="field"><label>模型名称</label><input type="text" id="cfgModel" placeholder="deepseek-v4-flash"></div>
       <div class="field"><label>API Key</label><input type="password" id="cfgApiKey" placeholder="sk-..."></div>
+    </div>
+    <div class="config-section player-api-section">
+      <div class="sec-title">🎮 玩家代理 API（斗蛐蛐模式专用）</div>
+      <p class="config-hint">选「斗蛐蛐」模式后，你本人也由 AI 接管，这里填写你那个 AI 分身调用的接口（留空则自动复用上方总 API）。</p>
+      <div class="field"><label>API 地址 (OpenAI 兼容)</label><input type="text" id="cfgPlayerApiUrl" placeholder="https://api.deepseek.com/v1/chat/completions"></div>
+      <div class="field"><label>模型名称</label><input type="text" id="cfgPlayerModel" placeholder="deepseek-v4-flash"></div>
+      <div class="field"><label>API Key</label><input type="password" id="cfgPlayerApiKey" placeholder="sk-..."></div>
     </div>
     <div class="config-section">
       <div class="sec-title">🎚️ 游戏难度</div>
@@ -1907,7 +1919,7 @@ let gameState = {
   selectedCards: [],
   tension: 0,
   gameMode: 'builtin',
-  config: { apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash', apiKey: '' }
+  config: { apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash', apiKey: '', playerApi: { apiUrl: '', model: '', apiKey: '' } }
 };
 
 const PERSONA_DEFAULTS = {
@@ -1935,12 +1947,35 @@ function isLLMConfigured() {
   if (c && c.apiUrl && c.apiUrl.trim() && c.apiKey && c.apiKey.trim()) return true;
   return gameState.players.some(p => p.api && p.api.useOwn && p.api.apiUrl && p.api.apiUrl.trim() && p.api.apiKey && p.api.apiKey.trim());
 }
-// 当前玩家是否可用 LLM（AI 模式下且有可用接口 + 密钥）
-function isLLMUsable(player) {
-  if (gameState.gameMode !== 'ai') return false;
+// 解析某玩家实际使用的 API 配置：独立 API > 玩家代理 API(仅斗蛐蛐人类席) > 总 API
+function resolveApi(player) {
+  // 1) 玩家独立 API
+  if (player && player.api && player.api.useOwn && player.api.apiUrl && player.api.apiUrl.trim() && player.api.apiKey && player.api.apiKey.trim()) {
+    return { apiUrl: player.api.apiUrl, model: player.api.model, apiKey: player.api.apiKey };
+  }
+  // 2) 斗蛐蛐模式下，人类席(被 AI 接管)使用专属「玩家代理 API」
+  if (player && player.isHuman && gameState.gameMode === 'spectate') {
+    const pa = gameState.config.playerApi;
+    if (pa && pa.apiUrl && pa.apiUrl.trim() && pa.apiKey && pa.apiKey.trim()) {
+      return { apiUrl: pa.apiUrl, model: pa.model, apiKey: pa.apiKey };
+    }
+  }
+  // 3) 总 API
   const c = gameState.config;
-  if (c && c.apiUrl && c.apiUrl.trim() && c.apiKey && c.apiKey.trim()) return true;
-  return !!(player && player.api && player.api.useOwn && player.api.apiUrl && player.api.apiUrl.trim() && player.api.apiKey && player.api.apiKey.trim());
+  if (c && c.apiUrl && c.apiUrl.trim() && c.apiKey && c.apiKey.trim()) return { apiUrl: c.apiUrl, model: c.model, apiKey: c.apiKey };
+  return null;
+}
+// 斗蛐蛐模式：玩家代理 API 或 总 API 任一可用即可开局
+function isPlayerApiConfigured() {
+  const pa = gameState.config.playerApi;
+  if (pa && pa.apiUrl && pa.apiUrl.trim() && pa.apiKey && pa.apiKey.trim()) return true;
+  const c = gameState.config;
+  return !!(c && c.apiUrl && c.apiUrl.trim() && c.apiKey && c.apiKey.trim());
+}
+// 当前玩家是否可用 LLM（AI / 斗蛐蛐 模式下且有可用接口 + 密钥）
+function isLLMUsable(player) {
+  if (gameState.gameMode !== 'ai' && gameState.gameMode !== 'spectate') return false;
+  return !!resolveApi(player);
 }
 
 // ==================== 音频系统（WebAudio 合成，无需外部文件） ====================
@@ -2189,21 +2224,35 @@ function hideModeModal() {
 
 function startGame(mode) {
   gameState.gameMode = mode;
-  // 选「AI模型」模式但还没配置过接口：先进配置界面，配好后再自动开局
-  if (mode === 'ai' && !isLLMConfigured()) {
+  // 选「AI模型」/「斗蛐蛐」模式但接口未配置：先进配置界面，配好后再自动开局
+  const needsConfig = (mode === 'ai' && !isLLMConfigured()) || (mode === 'spectate' && !isPlayerApiConfigured());
+  if (needsConfig) {
     pendingGameMode = mode;
     hideModeModal();
     showConfig();
-    addLog('⚙️ 检测到尚未配置 AI 接口，请先填写并保存配置（保存后将自动开始游戏）', 'sys');
+    if (mode === 'spectate') {
+      addLog('⚙️ 斗蛐蛐模式需要配置「玩家代理 API」（未填则复用总 API），请先填写并保存（保存后将自动开始）', 'sys');
+      focusPlayerApiSection();
+    } else {
+      addLog('⚙️ 检测到尚未配置 AI 接口，请先填写并保存配置（保存后将自动开始游戏）', 'sys');
+    }
     return;
   }
   hideModeModal();
   AudioSys.init();
   AudioSys.startBGM();
   initGame();
+  // 斗蛐蛐模式：人类席由 AI 接管，给一个默认人设让 LLM 扮演有性格的「你」
+  if (mode === 'spectate') {
+    const human = gameState.players.find(p => p.isHuman);
+    if (human && !human.personalityText) {
+      human.personalityText = '你就是玩家本人，现在被 AI 接管继续对局。你风格沉稳、审时度势，既敢果断质疑上家，也敢虚张声势，目标只有一个——赢下整局。';
+    }
+  }
   gameState.gameStarted = true;
   gameState.roundCount = 1;
-  addLog('🎴 游戏开始！模式：' + (mode === 'builtin' ? '内置AI' : 'AI模型'), 'sys');
+  const modeName = mode === 'builtin' ? '内置AI' : mode === 'ai' ? 'AI模型' : '斗蛐蛐(全员AI)';
+  addLog('🎴 游戏开始！模式：' + modeName, 'sys');
   dealCards();
   gameState.targetCard = ['Q','K','A'][Math.floor(Math.random()*3)];
   gameState.targetCardsRevealed = 0;
@@ -2257,7 +2306,7 @@ function nextTurn() {
 
   renderSeats();
   renderActions();
-  if (current.isHuman) { humanTurn(current); }
+  if (current.isHuman && gameState.gameMode !== 'spectate') { humanTurn(current); }
   else { setTimeout(() => aiTurn(current), 800); }
 }
 
@@ -2268,6 +2317,7 @@ function advanceTurn(requireCards = false) {
   return true;
 }
 function humanTurn(player) {
+  if (!player || !player.isHuman || gameState.gameMode === 'spectate') return;
   addLog('👉 轮到你了，请出牌', 'act');
   renderHand();
   renderActions();
@@ -2282,8 +2332,8 @@ async function aiTurn(player) {
   showBubble(player, '思考中', 'thinking');
   addLog('🤖 【' + player.name + '】正在思考...', 'sys');
 
-  // 思考等待：内置模式长一点更自然；AI模式让LLM调用填充时间
-  const thinkMs = gameState.gameMode === 'ai'
+  // 思考等待：内置模式长一点更自然；AI/斗蛐蛐模式让LLM调用填充时间
+  const thinkMs = (gameState.gameMode === 'ai' || gameState.gameMode === 'spectate')
     ? 1200 + Math.random() * 900
     : 5000 + Math.random() * 1500;
   await wait(thinkMs);
@@ -2387,21 +2437,21 @@ function beginChallengeAfterPlay(playedBy, cards, isLying) {
   gameState.awaitingChallenge = true;
   gameState.forcedChallenge = forcedChallenge;
 
-  if (nextPlayer.isHuman) {
+  if (nextPlayer.isHuman && gameState.gameMode !== 'spectate') {
     addLog(forcedChallenge ? '⚠️ 本轮只剩一名玩家持牌，必须质疑上家！' : '❓ ' + nextPlayer.name + '，是否质疑？', 'chal');
     renderSeats();
     renderActions();
     return;
   }
 
-  if (playedBy.isHuman) showReactionModal();
+  if (playedBy.isHuman && gameState.gameMode !== 'spectate') showReactionModal();
   // 触发其他存活AI对这次出牌的发言（拱火/推理），错峰显示在气泡中
   triggerBanter(playedBy, cards.length);
-  const baseDelay = playedBy.isHuman ? 2000 : 3000;
-  const extra = gameState.gameMode === 'ai' ? 1600 : 0;
+  const baseDelay = (playedBy.isHuman && gameState.gameMode !== 'spectate') ? 2000 : 3000;
+  const extra = (gameState.gameMode === 'ai' || gameState.gameMode === 'spectate') ? 1600 : 0;
   setTimeout(() => {
     if (gameState.gameOver) return;
-    if (playedBy.isHuman) hideReactionModal();
+    if (playedBy.isHuman && gameState.gameMode !== 'spectate') hideReactionModal();
     aiChallengeDecision(nextPlayer, playedBy, cards, isLying, forcedChallenge);
   }, baseDelay + extra);
 }
@@ -2795,7 +2845,7 @@ async function performPenalty(player) {
 function selectCard(idx) {
   if (!gameState.gameStarted || gameState.gameOver) return;
   const current = gameState.players[gameState.currentPlayerIdx];
-  if (!current.isHuman) return;
+  if (!current.isHuman || gameState.gameMode === 'spectate') return;
   // 只有出牌阶段才能选牌（质疑阶段不能选）
   if (gameState.lastPlayerIdx !== -1 && gameState.lastPlayerIdx !== current.id) return;
   const i = gameState.selectedCards.indexOf(idx);
@@ -2942,7 +2992,7 @@ function renderSeats() {
     // 信息面板
     const info = document.createElement('div');
     info.className = 'info-panel';
-    const roleText = p.isHuman ? '玩家' : (p.personality === 'aggressive' ? '激进' : p.personality === 'analytical' ? '理性' : '谨慎');
+    const roleText = p.isHuman ? (gameState.gameMode === 'spectate' ? '玩家·AI接管' : '玩家') : (p.personality === 'aggressive' ? '激进' : p.personality === 'analytical' ? '理性' : '谨慎');
     info.innerHTML = '<div class="info-name">' + p.name + '</div><div class="info-role">' + roleText + '</div>';
 
     // 手牌数量 (游戏开始后显示)
@@ -3097,7 +3147,7 @@ function renderActions() {
     return;
   }
   const current = gameState.players[gameState.currentPlayerIdx];
-  if (!current || !current.isHuman) return;
+  if (!current || !current.isHuman || gameState.gameMode === 'spectate') return;
 
   // 质疑阶段：上家出了牌，当前玩家是下家
   if (gameState.lastPlayerIdx !== -1 && gameState.lastPlayerIdx !== current.id) {
@@ -3314,13 +3364,11 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) { return escapeHtml(s); }
 
-// 调用 OpenAI 兼容接口。优先使用玩家独立API，否则用总API。
+// 调用 OpenAI 兼容接口。实际使用的 API 由 resolveApi 按「独立API > 玩家代理API(斗蛐蛐) > 总API」解析。
 // 返回文本字符串，失败/超时/未配置返回 null。
 async function callAI(player, systemPrompt, userPrompt) {
-  const useOwn = player && player.api && player.api.useOwn && player.api.apiUrl;
-  const cfg = useOwn
-    ? { apiUrl: player.api.apiUrl, model: player.api.model, apiKey: player.api.apiKey }
-    : gameState.config;
+  const cfg = resolveApi(player);
+  if (!cfg) { window.__lastAIError = '未填写可用的 API 配置'; return null; }
   const apiUrl = (cfg.apiUrl || '').trim();
   const apiKey = (cfg.apiKey || '').trim();
   const model = (cfg.model || 'gpt-4').trim();
@@ -3370,7 +3418,7 @@ async function callAI(player, systemPrompt, userPrompt) {
 // situation: 'banter'（对出牌的反应）| 'play'（出牌前表态）| 'challenge' | 'pass'
 async function getAIBubble(player, situation, extra) {
   extra = extra || {};
-  if (gameState.gameMode !== 'ai') return getDialogue(player, situation);
+  if (gameState.gameMode !== 'ai' && gameState.gameMode !== 'spectate') return getDialogue(player, situation);
 
   const target = gameState.targetCard;
   const round = gameState.roundCount;
@@ -3407,8 +3455,9 @@ async function getAIBubble(player, situation, extra) {
 
 // 某人出牌后，其他存活 AI 各自发表 1~3 句短评（错峰显示）
 async function triggerBanter(actor, count) {
-  if (gameState.gameMode !== 'ai' || gameState.gameOver) return;
-  const reactors = gameState.players.filter(p => p.alive && !p.isHuman && p.id !== actor.id);
+  if ((gameState.gameMode !== 'ai' && gameState.gameMode !== 'spectate') || gameState.gameOver) return;
+  // 斗蛐蛐模式下玩家席也由 AI 接管，应参与拱火点评；其余模式排除真实玩家
+  const reactors = gameState.players.filter(p => p.alive && p.id !== actor.id && (gameState.gameMode === 'spectate' || !p.isHuman));
   if (reactors.length === 0) return;
   const jobs = reactors.map(p => getAIBubble(p, 'banter', { actorName: actor.name, count })
     .then(text => ({ p, text }))
@@ -3901,6 +3950,13 @@ function showConfig() {
   document.getElementById('cfgApiUrl').value = cfg.apiUrl || 'https://api.deepseek.com/v1/chat/completions';
   document.getElementById('cfgModel').value = cfg.model || 'deepseek-v4-flash';
   document.getElementById('cfgApiKey').value = cfg.apiKey || '';
+  const pa = cfg.playerApi || {};
+  const pau = document.getElementById('cfgPlayerApiUrl');
+  const pam = document.getElementById('cfgPlayerModel');
+  const pak = document.getElementById('cfgPlayerApiKey');
+  if (pau) pau.value = pa.apiUrl || '';
+  if (pam) pam.value = pa.model || '';
+  if (pak) pak.value = pa.apiKey || '';
   const mcb = document.getElementById('cfgMultiHp');
   if (mcb) mcb.checked = !!gameSettings.multiHp;
   // 构建每个 AI 玩家的配置卡片
@@ -3932,10 +3988,28 @@ function toggleOwnApi(id) {
   if (cb && fields) fields.classList.toggle('show', cb.checked);
 }
 function hideConfigModal() { document.getElementById('configModal').classList.remove('show'); }
+// 进入配置界面后，自动滚动并聚焦到「玩家代理 API」区域（斗蛐蛐模式门禁用）
+function focusPlayerApiSection() {
+  setTimeout(() => {
+    const el = document.getElementById('cfgPlayerApiUrl');
+    if (!el) return;
+    const sec = el.closest('.player-api-section');
+    if (sec) sec.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
+  }, 60);
+}
 function saveConfig() {
   gameState.config.apiUrl = document.getElementById('cfgApiUrl').value.trim() || 'https://api.deepseek.com/v1/chat/completions';
   gameState.config.model = document.getElementById('cfgModel').value.trim() || 'deepseek-v4-flash';
   gameState.config.apiKey = document.getElementById('cfgApiKey').value.trim();
+  const pau = document.getElementById('cfgPlayerApiUrl');
+  const pam = document.getElementById('cfgPlayerModel');
+  const pak = document.getElementById('cfgPlayerApiKey');
+  gameState.config.playerApi = {
+    apiUrl: (pau ? pau.value : '').trim(),
+    model: (pam ? pam.value : '').trim(),
+    apiKey: (pak ? pak.value : '').trim()
+  };
   const mcb = document.getElementById('cfgMultiHp');
   if (mcb) { gameSettings.multiHp = mcb.checked; persistGameSettings(); }
   gameState.players.filter(p => !p.isHuman).forEach(p => {
@@ -4006,7 +4080,8 @@ function resetConfigResidue() {
   gameState.config = {
     apiUrl: 'https://api.deepseek.com/v1/chat/completions',
     model: 'deepseek-v4-flash',
-    apiKey: ''
+    apiKey: '',
+    playerApi: { apiUrl: '', model: '', apiKey: '' }
   };
   const u = document.getElementById('cfgApiUrl');
   const m = document.getElementById('cfgModel');
@@ -4014,6 +4089,12 @@ function resetConfigResidue() {
   if (u) u.value = gameState.config.apiUrl;
   if (m) m.value = gameState.config.model;
   if (k) k.value = '';
+  const pu = document.getElementById('cfgPlayerApiUrl');
+  const pm = document.getElementById('cfgPlayerModel');
+  const pk = document.getElementById('cfgPlayerApiKey');
+  if (pu) pu.value = '';
+  if (pm) pm.value = '';
+  if (pk) pk.value = '';
   showConfigToast('已清除浏览器残留配置，恢复 DeepSeek 默认');
 }
 function persistConfig() {
@@ -4041,6 +4122,13 @@ function loadPersistedConfig() {
       gameState.config.apiUrl = (c.apiUrl && c.apiUrl.trim()) ? c.apiUrl.trim() : def.apiUrl;
       gameState.config.model = (c.model && c.model.trim() && c.model.trim() !== 'gpt-4') ? c.model.trim() : def.model;
       gameState.config.apiKey = (c.apiKey && c.apiKey.trim()) ? c.apiKey.trim() : '';
+      // 玩家代理 API（斗蛐蛐模式用），旧配置缺省则回退空
+      const pa = c.playerApi || {};
+      gameState.config.playerApi = {
+        apiUrl: (pa.apiUrl && pa.apiUrl.trim()) ? pa.apiUrl.trim() : '',
+        model: (pa.model && pa.model.trim()) ? pa.model.trim() : '',
+        apiKey: (pa.apiKey && pa.apiKey.trim()) ? pa.apiKey.trim() : ''
+      };
     }
     if (data.overrides) playerOverrides = data.overrides || {};
   } catch (e) { /* 忽略 */ }
