@@ -658,12 +658,30 @@ body {
   box-shadow: 0 0 20px rgba(251,191,36,0.6), 0 0 0 3px rgba(251,191,36,0.2), 0 4px 12px rgba(0,0,0,0.4);
   background: linear-gradient(135deg, #fff3d6, #f5e6d3);
   transform: translateY(-8px) scale(1.08);
-  animation: cardGlow 1.5s ease-in-out infinite;
+  animation: cardSelectPop 0.3s ease-out, cardGlow 1.5s ease-in-out infinite;
   z-index: 3;
+}
+@keyframes cardSelectPop {
+  0% { transform: translateY(0) scale(1); }
+  60% { transform: translateY(-12px) scale(1.14); }
+  100% { transform: translateY(-8px) scale(1.08); }
 }
 @keyframes cardGlow {
   0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.5), 0 0 0 3px rgba(251,191,36,0.15); }
   50% { box-shadow: 0 0 28px rgba(251,191,36,0.8), 0 0 0 3px rgba(251,191,36,0.3); }
+}
+/* 斗蛐蛐模式：AI 接管的人类席出牌前，先在手牌栏高亮被选中的牌，让玩家看清出了哪些 */
+.playing-card.ai-pick {
+  border-color: #fbbf24;
+  background: linear-gradient(135deg, #fff3d6, #ffe0a3);
+  transform: translateY(-12px) scale(1.14);
+  box-shadow: 0 0 26px rgba(251,191,36,0.95), 0 0 0 3px rgba(251,191,36,0.45);
+  animation: aiPickPulse 0.35s ease-in-out 2;
+  z-index: 5;
+}
+@keyframes aiPickPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(251,191,36,0.6), 0 0 0 3px rgba(251,191,36,0.3); }
+  50% { box-shadow: 0 0 34px rgba(251,191,36,1), 0 0 0 4px rgba(251,191,36,0.55); }
 }
 .playing-card .card-corner {
   position: absolute;
@@ -1155,6 +1173,8 @@ body {
 .modal .field input:focus { outline: none; border-color: var(--accent-gold); }
 .modal .field textarea.pc-persona { width: 100%; min-height: 56px; resize: vertical; padding: 8px 10px; background: var(--bg-panel); border: 1px solid var(--border-gold); border-radius: 6px; color: var(--text-primary); font-size: 12px; line-height: 1.5; font-family: var(--font-main); }
 .modal .field textarea.pc-persona:focus { outline: none; border-color: var(--accent-gold); }
+.modal .field select { width: 100%; padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-gold); border-radius: 6px; color: var(--text-primary); font-size: 13px; font-family: var(--font-main); }
+.modal .field select:focus { outline: none; border-color: var(--accent-gold); }
 
 /* AI设置：可滚动大弹窗 */
 .config-modal { width: min(580px, 94%); max-height: 88vh; overflow-y: auto; }
@@ -1803,6 +1823,20 @@ body {
       <div class="field"><label>模型名称</label><input type="text" id="cfgPlayerModel" placeholder="deepseek-v4-flash"></div>
       <div class="field"><label>API Key</label><input type="password" id="cfgPlayerApiKey" placeholder="sk-..."></div>
     </div>
+    <div class="config-section player-persona-section">
+      <div class="sec-title">🧑 你的性格 / 人设（斗蛐蛐模式生效）</div>
+      <p class="config-hint">选「斗蛐蛐」模式后，你本人也由 AI 接管。这里决定「被 AI 接管的你」是什么性格、怎么说话、怎么决策。</p>
+      <div class="field"><label>性格风格</label>
+        <select id="cfgPlayerPersonality">
+          <option value="aggressive">激进好斗（爱拱火、敢虚张）</option>
+          <option value="analytical">冷静理性（爱推理、算概率）</option>
+          <option value="timid">胆小谨慎（易紧张、少质疑）</option>
+        </select>
+      </div>
+      <div class="field"><label>自定义人设（写给 AI 的系统提示，留空则用上方性格的默认话术）</label>
+        <textarea id="cfgPlayerPersona" class="pc-persona" placeholder="例如：你沉稳老练，擅长虚张声势，关键时刻果断出击，既敢质疑也懂装傻……"></textarea>
+      </div>
+    </div>
     <div class="config-section">
       <div class="sec-title">🎚️ 游戏难度</div>
       <label class="own-api-toggle"><input type="checkbox" id="cfgMultiHp"> 降低难度（3 条命，中弹只扣 1 点）</label>
@@ -1873,28 +1907,31 @@ const CARDS_PER_HAND = 5;
 const PERSONALITIES = ['aggressive', 'analytical', 'timid'];
 const DIALOGUE_POOL = {
   aggressive: {
-    play: ['就这？太简单了', '你们等着瞧', '这把稳了', '跟不跟？', '不信就质疑', '我从来不慌', '梭哈！'],
-    challenge: ['骗人！', '我不信', '你在说谎', '露出马脚了吧', '太假了', '质疑！', '别想骗我'],
-    pass: ['算了放过你', '下次就没这么幸运', '算你走运', '暂时相信你', '我再看看'],
-    lieCaught: ['运气不好', '下次还敢', '哼...', '算你狠'],
-    survive: ['命大', '哈哈哈死不了', '再来啊', '走运而已'],
-    death: ['不！！', '这不可能...', '下次报仇...', '不甘心...']
+    play: ['就这？太简单了', '你们等着瞧', '这把稳了', '跟不跟？', '不信就质疑', '我从来不慌', '梭哈！', '怕了就认输', '看好了啊', '轮不到你说话', '这才哪到哪', '上膛了没？'],
+    challenge: ['骗人！', '我不信', '你在说谎', '露出马脚了吧', '太假了', '质疑！', '别想骗我', '你演技太差', '当我瞎？', '赌一把，你肯定虚', '有种就翻开'],
+    pass: ['算了放过你', '下次就没这么幸运', '算你走运', '暂时相信你', '我再看看', '先记你一笔', '这回饶了你', '等我找机会', '装得挺像'],
+    lieCaught: ['运气不好', '下次还敢', '哼...', '算你狠', '被阴了', '手气真背'],
+    survive: ['命大', '哈哈哈死不了', '再来啊', '走运而已', '吓不着我'],
+    death: ['不！！', '这不可能...', '下次报仇...', '不甘心...', '凭什么...'],
+    banter: ['就这演技也敢骗人', '我看你快绷不住了', '下家别怂啊', '这局我吃定了', '谁先露怯谁孙子', '牌桌如战场', '你手心冒汗了吧', '继续装，我喜欢']
   },
   analytical: {
-    play: ['根据概率...', '这是最优解', '出牌', '分析完毕', '逻辑上可行', '这样做最合理'],
-    challenge: ['概率不对', '这不合逻辑', '数据不支持', '有漏洞', '统计上说你在说谎'],
-    pass: ['暂不质疑', '证据不足', '继续观察', '等待时机'],
-    lieCaught: ['计算失误', '概率没算对', '下次改进'],
-    survive: ['概率眷顾', '幸免于难', '继续分析'],
-    death: ['概率...终究...', '不应该是这样...']
+    play: ['根据概率...', '这是最优解', '出牌', '分析完毕', '逻辑上可行', '这样做最合理', '按胜率走', '稳一手', '数据不会骗我', '该收网了'],
+    challenge: ['概率不对', '这不合逻辑', '数据不支持', '有漏洞', '统计上说你在说谎', '节奏太刻意了', '你出牌频率异常', '该收网了'],
+    pass: ['暂不质疑', '证据不足', '继续观察', '等待时机', '先放长线', '还不到时候', '留着你后面用'],
+    lieCaught: ['计算失误', '概率没算对', '下次改进', '被蒙混了', '低估了对手'],
+    survive: ['概率眷顾', '幸免于难', '继续分析', '模型又对了'],
+    death: ['概率...终究...', '不应该是这样...', '样本太小了', '我算漏了一步'],
+    banter: ['他这手出牌偏激进', '目前目标牌已见多半', '有人在控场', '该重新评估信任度了', '按节奏下家该慌了', '这局信息量很大', '我记着账呢']
   },
   timid: {
-    play: ['我...我出牌', '希望是对的', '别质疑我', '就这样吧', '我不敢撒谎...', '好吧我出'],
-    challenge: ['你...你说谎？', '我...我不确定', '可能...可能有问题', '我...我质疑', '别骗我好吗'],
-    pass: ['我不敢', '算了吧', '我害怕', '相信你一次'],
-    lieCaught: ['对不起...', '我不是故意的', '下次不敢了'],
-    survive: ['太好了...', '吓死我了', '还活着...'],
-    death: ['啊...', '不要...', '救命...']
+    play: ['我...我出牌', '希望是对的', '别质疑我', '就这样吧', '我不敢撒谎...', '好吧我出', '小...小心点', '应该...没问题吧', '我跟着感觉走'],
+    challenge: ['你...你说谎？', '我...我不确定', '可能...可能有问题', '我...我质疑', '别骗我好吗', '我有点慌', '真...真的假的'],
+    pass: ['我不敢', '算了吧', '我害怕', '相信你一次', '还是稳妥点', '下次再算', '我...我信你'],
+    lieCaught: ['对不起...', '我不是故意的', '下次不敢了', '别开枪...'],
+    survive: ['太好了...', '吓死我了', '还活着...', '虚惊一场'],
+    death: ['啊...', '不要...', '救命...', '我还没...'],
+    banter: ['他好凶我好怕', '希望别轮到我', '谁都别盯着我', '手都在抖', '这气氛太压抑', '我尽量装镇定']
   }
 };
 
@@ -1919,7 +1956,7 @@ let gameState = {
   selectedCards: [],
   tension: 0,
   gameMode: 'builtin',
-  config: { apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash', apiKey: '', playerApi: { apiUrl: '', model: '', apiKey: '' } }
+  config: { apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash', apiKey: '', playerApi: { apiUrl: '', model: '', apiKey: '' }, playerPersona: { type: 'analytical', text: '' } }
 };
 
 const PERSONA_DEFAULTS = {
@@ -2242,11 +2279,15 @@ function startGame(mode) {
   AudioSys.init();
   AudioSys.startBGM();
   initGame();
-  // 斗蛐蛐模式：人类席由 AI 接管，给一个默认人设让 LLM 扮演有性格的「你」
+  // 斗蛐蛐模式：人类席由 AI 接管，把玩家在设置里选的性格/人设应用到「被接管的你」
   if (mode === 'spectate') {
     const human = gameState.players.find(p => p.isHuman);
-    if (human && !human.personalityText) {
-      human.personalityText = '你就是玩家本人，现在被 AI 接管继续对局。你风格沉稳、审时度势，既敢果断质疑上家，也敢虚张声势，目标只有一个——赢下整局。';
+    if (human) {
+      const pp = gameState.config.playerPersona || { type: 'analytical', text: '' };
+      human.personality = (pp.type && ['aggressive','analytical','timid'].includes(pp.type)) ? pp.type : 'analytical';
+      human.personalityText = (pp.text && pp.text.trim())
+        ? pp.text.trim()
+        : (PERSONA_DEFAULTS[human.personality] || '你就是玩家本人，现在被 AI 接管继续对局。你沉稳、审时度势，既敢果断质疑，也敢虚张声势，目标只有一个——赢。');
     }
   }
   gameState.gameStarted = true;
@@ -2400,13 +2441,17 @@ async function aiTurn(player) {
   addLog('💬 【' + player.name + '】"' + playLine.replace(/\n/g, ' ') + '"', 'dia');
   await wait(500);
 
-  // 飞行动画：从AI头像飞向桌面（AI出牌显示牌背）
-  animateCardsFromPlayer(player, chosen, () => {
-    if (gameState.gameOver) return;
-    playCards(player, chosen, isLying);
-    if (gameState.gameOver) return;
-    beginChallengeAfterPlay(player, chosen, isLying);
-  }, true); // true = 显示牌背
+  // 飞行动画：AI 出牌显示牌背飞向桌面；斗蛐蛐模式下被 AI 接管的「你」先从手牌栏高亮选中的牌，再飞向桌面
+  if (player.isHuman) {
+    await aiProxyPlayWithHandAnim(player, chosen, isLying);
+  } else {
+    animateCardsFromPlayer(player, chosen, () => {
+      if (gameState.gameOver) return;
+      playCards(player, chosen, isLying);
+      if (gameState.gameOver) return;
+      beginChallengeAfterPlay(player, chosen, isLying);
+    }, true); // true = 显示牌背
+  }
 }
 
 function getNextAliveIndex(idx, requireCards = false) {
@@ -2457,15 +2502,52 @@ function beginChallengeAfterPlay(playedBy, cards, isLying) {
 }
 
 // ==================== 出牌动画 ====================
-function animateCardsFromPlayer(player, cards, callback, showBack) {
+// 根据选中的牌值，返回其在手牌中的下标（处理重复牌，逐个匹配、不重复）
+function indicesForCards(hand, chosen) {
+  const idx = [];
+  const used = new Set();
+  for (const c of chosen) {
+    const i = hand.findIndex((h, j) => h === c && !used.has(j));
+    if (i >= 0) { used.add(i); idx.push(i); }
+  }
+  return idx;
+}
+
+// 斗蛐蛐模式：AI 接管的人类席出牌时，先在手牌栏高亮被选中的牌、停顿，再从手牌位置飞向桌面，
+// 让玩家清楚看到「被 AI 接管的自己」选了哪些牌。
+async function aiProxyPlayWithHandAnim(player, chosen, isLying) {
+  const idxList = indicesForCards(player.hand, chosen);
+  const handEls = document.querySelectorAll('#handWrap .playing-card');
+  const startRects = [];
+  idxList.forEach(i => {
+    const el = handEls[i];
+    if (el) {
+      el.classList.add('ai-pick');
+      startRects.push(el.getBoundingClientRect());
+    } else {
+      startRects.push(null);
+    }
+  });
+  await wait(750);
+  // 取消高亮，让牌「离手」飞出
+  idxList.forEach(i => { const el = handEls[i]; if (el) el.classList.remove('ai-pick'); });
+  animateCardsFromPlayer(player, chosen, () => {
+    if (gameState.gameOver) return;
+    playCards(player, chosen, isLying);
+    if (gameState.gameOver) return;
+    beginChallengeAfterPlay(player, chosen, isLying);
+  }, true, startRects);
+}
+
+function animateCardsFromPlayer(player, cards, callback, showBack, startRects) {
   const seat = document.querySelector('.seat[data-id="' + player.id + '"]');
   const zone = document.getElementById('playZone');
   if (!seat || !zone) { callback(); return; }
 
   const seatRect = seat.getBoundingClientRect();
   const zoneRect = zone.getBoundingClientRect();
-  const startX = seatRect.left + seatRect.width / 2;
-  const startY = seatRect.top + seatRect.height / 2;
+  const seatX = seatRect.left + seatRect.width / 2;
+  const seatY = seatRect.top + seatRect.height / 2;
   const endX = zoneRect.left + zoneRect.width / 2;
   const endY = zoneRect.top + zoneRect.height / 2;
 
@@ -2475,7 +2557,10 @@ function animateCardsFromPlayer(player, cards, callback, showBack) {
       audioSfx('card'); // 出牌音效
       const fly = showBack ? createCardBackElement() : createFlyingCard(card);
 
-      // 起点：玩家头像中心
+      // 起点：优先用对应手牌的位置（AI 接管的人类席），否则用玩家头像中心
+      let startX = seatX, startY = seatY;
+      const sr = startRects && startRects[i];
+      if (sr) { startX = sr.left + sr.width / 2; startY = sr.top + sr.height / 2; }
       fly.style.left = (startX - 28) + 'px';
       fly.style.top = (startY - 40) + 'px';
       fly.style.transform = 'scale(0.6) rotate(0deg)';
@@ -2651,11 +2736,24 @@ async function aiChallengeDecisionLLM(challenger, targetPlayer, cards, isLying, 
   const round = gameState.roundCount;
   const trust = challenger.trustLevels[targetPlayer.name] || 50;
   const ownHand = challenger.hand.map(c => c === 'Joker' ? 'Joker(万能)' : (c === target ? c + '(目标)' : c)).join('、');
+  const ownTargetCount = challenger.hand.filter(c => c === target).length;
+  const aliveCount = gameState.players.filter(p => p.alive).length;
+  // 本轮目标牌共 6 张（每种点数各 6 张），已揭示的越多，未现世的目标牌越少
+  const totalTarget = 6;
+  const revealedTarget = gameState.targetCardsRevealed || 0;
+  const remainTarget = Math.max(0, totalTarget - revealedTarget - ownTargetCount);
+  const chanceText = remainTarget <= 1
+    ? '目标牌已基本现世，上家若宣称多张目标牌极可能在撒谎'
+    : (remainTarget >= 4 ? '目标牌还有很多未现世，上家手里有目标牌的概率偏高' : '目标牌已现世一部分，需结合信任度判断');
 
   const sys = '你是《骗子酒馆》玩家「' + challenger.name + '」，性格：' + (challenger.personalityText || '') +
     '\n严格限制：你【只能】知道【你自己】的手牌，绝对不能知道其他玩家的手牌，也更不可能知道别人是否说谎。你的决策必须完全基于公开信息、对手的性格与你的推理来「赌」，而不是事实。' +
     '\n请扮演该角色，决定要不要质疑上家。';
-  const usr = '本轮目标牌：' + target + '。第' + round + '轮。\n上家【' + targetPlayer.name + '】打出了' + cards.length + '张牌，并宣称这些牌都是目标牌【' + target + '】（你不知道真伪）。\n你目前对' + targetPlayer.name + '的信任度：' + trust + '/100（越高越倾向于相信他）。\n你的手牌：' + ownHand + '。\n现在轮到你决定：是要「质疑」上家，还是「相信」他？\n只回复一个词：质疑 或 相信。不要任何解释。';
+  const usr = '【公开信息】本轮目标牌：' + target + '（全场共 6 张，已揭示 ' + revealedTarget + ' 张，你自己手里有 ' + ownTargetCount + ' 张，未现世的还剩 ' + remainTarget + ' 张）。第 ' + round + ' 轮，存活玩家 ' + aliveCount + ' 人。' +
+    '\n【上家】' + targetPlayer.name + ' 刚打出 ' + cards.length + ' 张牌，宣称全都是目标牌【' + target + '】（你不知道真伪）。' +
+    '\n【你的信任度】你对 ' + targetPlayer.name + ' 的信任度为 ' + trust + '/100（越高越倾向相信）。' +
+    '\n【推理线索】' + chanceText + (trust < 35 ? '；而且他一直让你不放心。' : (trust > 75 ? '；不过他前面表现挺老实。' : '。')) +
+    '\n【你的手牌】' + ownHand + '。\n现在轮到你决定：是「质疑」上家，还是「相信」他？请综合上面的公开信息做概率判断。\n只回复一个词：质疑 或 相信。不要任何解释。';
 
   const decision = await callAI(challenger, sys, usr);
   let shouldChallenge;
@@ -2701,11 +2799,20 @@ async function aiDecidePlay(player) {
   if (!hand || hand.length === 0) return null;
   const maxCount = Math.min(3, hand.length);
   const ownHand = hand.map((c, i) => (i + 1) + ':' + (c === 'Joker' ? 'Joker(万能)' : (c === target ? c + '(目标)' : c))).join('  ');
+  const ownTargetCount = hand.filter(c => c === target).length;
+  const ownOtherCount = hand.filter(c => c !== target && c !== 'Joker').length;
+  const revealedTarget = gameState.targetCardsRevealed || 0;
+  const remainTarget = Math.max(0, 6 - revealedTarget - ownTargetCount);
   const sys = '你是《骗子酒馆》玩家「' + player.name + '」，性格：' + (player.personalityText || '') +
     '\n严格限制：你【只能】知道【你自己】的手牌，绝不知道别人手牌或别人是否说谎。你的决策必须基于公开信息与策略来「赌」。' +
     '\n现在轮到你出牌。你要从自己手里选 1 到 ' + maxCount + ' 张牌打出，并对外宣称它们全都是本轮目标牌【' + target + '】。' +
-    '\n策略：手里有目标牌或万能牌时可如实打出（安全）；没有时可冒险打出别的牌虚张声势（说谎）。也可借多打几张施压或控场。';
-  const usr = '本轮目标牌：' + target + '。你的手牌（带序号）：' + ownHand + '\n请只回复一行：你要打出的手牌序号（1 到 ' + hand.length + '），用逗号分隔，写 1 到 ' + maxCount + ' 个，例如 "1" 或 "1,3"。不要任何解释。';
+    '\n【策略】\n1) 手里有目标牌或万能牌时，优先如实打出（安全、可信）。\n' +
+    '2) 手里目标牌不多、而你又想施压时，可混入或全用别的牌虚张声势（说谎），但张数越多被质疑风险越高。\n' +
+    '3) 参考公开信息：目标牌全场共 6 张，已揭示 ' + revealedTarget + ' 张，你手里有 ' + ownTargetCount + ' 张，未现世还剩 ' + remainTarget + ' 张。' +
+    '若剩余目标牌很少，对手更可能怀疑你虚张，此时撒谎宜少张；若剩余很多，你如实出目标牌更不易被质疑。\n' +
+    '4) 结合你的性格（激进就敢多张虚张、理性就控风险、谨慎就稳）。';
+  const usr = '【公开信息】本轮目标牌 ' + target + '，已揭示 ' + revealedTarget + ' 张，你手里目标牌 ' + ownTargetCount + ' 张、非目标牌 ' + ownOtherCount + ' 张（含万能牌按 Joker 计）。\n' +
+    '你的手牌（带序号）：' + ownHand + '\n请只回复一行：你要打出的手牌序号（1 到 ' + hand.length + '），用逗号分隔，写 1 到 ' + maxCount + ' 个，例如 "1" 或 "1,3"。不要任何解释。';
   const decision = await callAI(player, sys, usr);
   if (!decision) return null; // LLM 失败，交回内置逻辑
   const nums = (decision.match(/\d+/g) || []).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= hand.length);
@@ -3078,9 +3185,11 @@ function renderHand(isDeal) {
   // 发牌动画总时长：最后一张的延迟 + 单张动画(0.5s)，用于让后续游戏流程等它播完
   const dealDuration = isDeal && count > 0 ? (count - 1) * stepMs + 500 : 0;
   human.hand.forEach((card, i) => {
+    // 仅在「发牌/重开一轮」时播放逐张铺开动画；其余重渲染（如别人出牌刷新手牌）不播放，
+    // 避免干扰观看。选牌动画由 .selected 的弹出+发光(见 CSS)体现。
     const anim = isDeal
       ? { name: 'cardDeal', delay: i * stepMs }
-      : { name: 'cardEnter' };
+      : null;
     wrap.appendChild(createCardElement(card, i, gameState.selectedCards.includes(i), anim));
   });
   return dealDuration;
@@ -3105,7 +3214,7 @@ function createCardElement(card, index, isSelected, anim) {
     div.onclick = () => selectCard(index);
   }
 
-  // 入场动画：发牌时从左往右逐张铺开，其余情况用 cardEnter 弹出
+  // 入场动画：仅发牌时从左往右逐张铺开；其余情况不播放（选牌由 .selected 的弹出+发光体现）
   if (anim && anim.name) {
     div.style.animation = anim.name + ' 0.5s ease-out backwards';
     if (anim.delay) div.style.animationDelay = anim.delay + 'ms';
@@ -3354,7 +3463,9 @@ function showNotice(text, type) {
 
 function getDialogue(player, situation) {
   const pool = DIALOGUE_POOL[player.personality] || {};
-  const lines = pool[situation] || ['...'];
+  // banter 缺省时回退到 play，避免空台词
+  const lines = (pool[situation] && pool[situation].length) ? pool[situation]
+    : (situation === 'banter' && pool.play ? pool.play : ['...']);
   return lines[Math.floor(Math.random() * lines.length)];
 }
 
@@ -3432,8 +3543,11 @@ async function getAIBubble(player, situation, extra) {
   const baseSystem =
     '你是名为「' + player.name + '」的玩家，正在玩《骗子酒馆》卡牌游戏。' + (player.personalityText || '') +
     '\n规则：每轮从Q/K/A中随机一张作为目标牌，玩家轮流出牌并宣称打出的都是目标牌（牌背朝上，别的玩家看不到真伪）。下一位玩家可选择质疑或相信。' +
-    '\n严格限制：你【只能】知道【你自己】的手牌，绝对不能知道其他任何玩家的手牌，也不能知道别人是否说谎。你只能依据公开信息和推理来发言。' +
-    '\n发言要求：用中文、口语化、贴合你的性格；说1到3句，每句简短（最好不超过20字）；可以拱火、挑衅、分析推理或装无辜，但绝不要暴露你知道别人的牌。直接输出句子，用换行分隔，不要加引号或"我说："之类前缀。';
+    '\n严格限制：你【只能】知道【你自己】的手牌，绝对不能知道其他任何玩家的手牌，也绝不可能知道别人是否说谎。你只能依据公开信息和推理来发言。' +
+    '\n【禁止暴露底牌信息】你绝对不能说出任何暗示你"知道别人手里有什么牌"或"知道别人在撒谎"的话。例如严禁以下说法：' +
+    '「我没有这张目标牌」「你手里肯定没有X」「你刚才明明在骗人」「我知道你在说谎因为…」「你不可能是真的」。' +
+    '你只能描述自己的判断、感受和策略，例如「这把我感觉不太对劲」「我赌一把」「你演得挺像」之类。' +
+    '\n发言要求：用中文、口语化、贴合你的性格；说1到3句，每句简短（最好不超过20字）；可以拱火、挑衅、分析推理或装无辜。直接输出句子，用换行分隔，不要加引号或"我说："之类前缀。';
 
   let userPrompt = '';
   if (situation === 'banter') {
@@ -3957,6 +4071,11 @@ function showConfig() {
   if (pau) pau.value = pa.apiUrl || '';
   if (pam) pam.value = pa.model || '';
   if (pak) pak.value = pa.apiKey || '';
+  const pp = cfg.playerPersona || { type: 'analytical', text: '' };
+  const ppsel = document.getElementById('cfgPlayerPersonality');
+  const pptxt = document.getElementById('cfgPlayerPersona');
+  if (ppsel) ppsel.value = pp.type || 'analytical';
+  if (pptxt) pptxt.value = pp.text || '';
   const mcb = document.getElementById('cfgMultiHp');
   if (mcb) mcb.checked = !!gameSettings.multiHp;
   // 构建每个 AI 玩家的配置卡片
@@ -4009,6 +4128,12 @@ function saveConfig() {
     apiUrl: (pau ? pau.value : '').trim(),
     model: (pam ? pam.value : '').trim(),
     apiKey: (pak ? pak.value : '').trim()
+  };
+  const ppsel = document.getElementById('cfgPlayerPersonality');
+  const pptxt = document.getElementById('cfgPlayerPersona');
+  gameState.config.playerPersona = {
+    type: (ppsel ? ppsel.value : '') || 'analytical',
+    text: (pptxt ? pptxt.value : '').trim()
   };
   const mcb = document.getElementById('cfgMultiHp');
   if (mcb) { gameSettings.multiHp = mcb.checked; persistGameSettings(); }
@@ -4081,7 +4206,8 @@ function resetConfigResidue() {
     apiUrl: 'https://api.deepseek.com/v1/chat/completions',
     model: 'deepseek-v4-flash',
     apiKey: '',
-    playerApi: { apiUrl: '', model: '', apiKey: '' }
+    playerApi: { apiUrl: '', model: '', apiKey: '' },
+    playerPersona: { type: 'analytical', text: '' }
   };
   const u = document.getElementById('cfgApiUrl');
   const m = document.getElementById('cfgModel');
@@ -4095,6 +4221,10 @@ function resetConfigResidue() {
   if (pu) pu.value = '';
   if (pm) pm.value = '';
   if (pk) pk.value = '';
+  const ppsel = document.getElementById('cfgPlayerPersonality');
+  const pptxt = document.getElementById('cfgPlayerPersona');
+  if (ppsel) ppsel.value = 'analytical';
+  if (pptxt) pptxt.value = '';
   showConfigToast('已清除浏览器残留配置，恢复 DeepSeek 默认');
 }
 function persistConfig() {
@@ -4128,6 +4258,12 @@ function loadPersistedConfig() {
         apiUrl: (pa.apiUrl && pa.apiUrl.trim()) ? pa.apiUrl.trim() : '',
         model: (pa.model && pa.model.trim()) ? pa.model.trim() : '',
         apiKey: (pa.apiKey && pa.apiKey.trim()) ? pa.apiKey.trim() : ''
+      };
+      // 玩家性格/人设（斗蛐蛐模式用），旧配置缺省则回退默认
+      const pp = c.playerPersona || {};
+      gameState.config.playerPersona = {
+        type: (pp.type && ['aggressive','analytical','timid'].includes(pp.type)) ? pp.type : 'analytical',
+        text: (pp.text && pp.text.trim()) ? pp.text.trim() : ''
       };
     }
     if (data.overrides) playerOverrides = data.overrides || {};
