@@ -21,6 +21,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Build self-contained release HTML
+        run: python3 build.py
+
       - name: Sync deploy/ to gh-pages
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
