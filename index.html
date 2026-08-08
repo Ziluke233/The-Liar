@@ -2702,8 +2702,7 @@ async function aiChallengeDecision(challenger, targetPlayer, cards, isLying, for
     proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue);
   } else {
     const dialogue = await getAIBubble(challenger, 'pass', { actorName: targetPlayer.name });
-    // 决策气泡：先亮出“不质疑”（绿色），与说话气泡分离、不重叠
-    showBubble(challenger, '不质疑', 'pass');
+    // 只写入「对决记录」面板，不再弹悬浮决策气泡（避免与记录面板重复）
     showNotice(challenger.name + ' 不质疑', 'pass');
     addLog('💬 【' + challenger.name + '】"' + dialogue.replace(/\n/g, ' ') + '" (选择不质疑)', 'dia');
     gameState.lastPlayerIdx = -1; // 清除质疑状态
@@ -2712,7 +2711,7 @@ async function aiChallengeDecision(challenger, targetPlayer, cards, isLying, for
     // 不质疑 = 当前玩家继续出牌
     renderSeats();
     renderActions();
-    // 决策气泡展示约 1.3s 后，再冒出“说话气泡”（台词），先后出现、互不重叠
+    // 约 1.3s 后冒出“说话气泡”（台词），与对决记录先后出现、不重叠
     setTimeout(() => {
       if (!gameState.gameOver) showBubble(challenger, dialogue || '');
     }, 1300);
@@ -2774,8 +2773,7 @@ async function aiChallengeDecisionLLM(challenger, targetPlayer, cards, isLying, 
     proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue);
   } else {
     const dialogue = await getAIBubble(challenger, 'pass', { actorName: targetPlayer.name });
-    // 决策气泡：先亮出“不质疑”（绿色），与说话气泡分离、不重叠
-    showBubble(challenger, '不质疑', 'pass');
+    // 只写入「对决记录」面板，不再弹悬浮决策气泡（避免与记录面板重复）
     showNotice(challenger.name + ' 不质疑', 'pass');
     addLog('💬 【' + challenger.name + '】"' + dialogue.replace(/\n/g, ' ') + '" (选择不质疑)', 'dia');
     gameState.lastPlayerIdx = -1;
@@ -2783,7 +2781,7 @@ async function aiChallengeDecisionLLM(challenger, targetPlayer, cards, isLying, 
     gameState.forcedChallenge = false;
     renderSeats();
     renderActions();
-    // 决策气泡展示约 1.3s 后，再冒出“说话气泡”（台词），先后出现、互不重叠
+    // 约 1.3s 后冒出“说话气泡”（台词），与对决记录先后出现、不重叠
     setTimeout(() => {
       if (!gameState.gameOver) showBubble(challenger, dialogue || '');
     }, 1300);
@@ -2828,8 +2826,7 @@ async function aiDecidePlay(player) {
 
 // 统一的「发起质疑」动作（内置与 LLM 共用）
 function proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue) {
-  // 决策气泡：先亮出“质疑!”（红色），与说话气泡分离、不重叠
-  showBubble(challenger, '质疑!', 'challenge');
+  // 只写入「对决记录」面板，不再弹悬浮决策气泡（避免与记录面板重复）
   showNotice(challenger.name + ' 质疑!', 'challenge');
   addLog('⚡ 【' + challenger.name + '】质疑！"' + (dialogue || '').replace(/\n/g, ' ') + '"', 'chal');
   gameState.awaitingChallenge = false;
@@ -2837,7 +2834,7 @@ function proceedChallenge(challenger, targetPlayer, cards, isLying, dialogue) {
   setTimeout(() => {
     if (!gameState.gameOver) resolveChallenge(challenger, targetPlayer, cards, isLying);
   }, 600);
-  // 决策气泡展示约 1.3s 后，再冒出“说话气泡”（台词），先后出现、互不重叠
+  // 约 1.3s 后冒出“说话气泡”（台词），与对决记录先后出现、不重叠
   setTimeout(() => {
     if (!gameState.gameOver) showBubble(challenger, dialogue || '');
   }, 1300);
